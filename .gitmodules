@@ -1,0 +1,6 @@
+[submodule "authproxy"]
+	path = authproxy
+	url = https://github.com/kaiamann/authproxy
+[submodule "outproxy"]
+	path = outproxy
+	url = git@github.com:FAU-CDI/outproxy.git

@@ -1,0 +1,64 @@
+services:
+  rdf4j:
+    image: eclipse/rdf4j-workbench
+    restart: always
+    environment:
+      - JAVA_OPTS=-Xms1g -Xmx4g -Dhttp.nonProxyHosts="" -Dhttp.proxyHost=outproxy -Dhttp.proxyPort=8080 -Dhttps.proxyHost=outproxy -Dhttps.proxyPort=8080
+    volumes:
+      - rdf4j-data:/var/rdf4j
+      - rdf4j-logs:/usr/local/tomcat/logs
+
+  # TODO: for debugging only, remove when done
+  # serves to access the workbench since the production workbench cannot access the local
+  # rdf4j-server due to the outgoing proxy catching all the requests to localhost
+  rdf4j-debug-workbench:
+    image: eclipse/rdf4j-workbench
+    restart: always
+    ports:
+      - 9999:8080
+    environment:
+      - JAVA_OPTS=-Xms1g -Xmx4g
+    volumes:
+      - rdf4j-debug-workbench-data:/var/rdf4j
+      - rdf4j-debug-workbench-logs:/usr/local/tomcat/logs
+
+
+  nginx:
+    image: nginxinc/nginx-unprivileged:latest
+    restart: always
+    depends_on:
+      - rdf4j
+      - authproxy
+      - outproxy
+    ports:
+      - 80:80
+    volumes:
+        - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+  outproxy:
+    build:
+      context: outproxy
+    restart: always
+    depends_on:
+      - rdf4j
+
+  authproxy:
+    build:
+      context: authproxy
+    restart: always
+    environment:
+      - DJANGO_SECRET_KEY=supersecret
+      - DJANGO_SUPERUSER_NAME=admin
+      - DJANGO_SUPERUSER_PASSWORD=123456789
+      - DJANGO_SUPERUSER_EMAIL=
+    depends_on:
+      - rdf4j
+    volumes:
+      - authproxy-data:/data/
+
+volumes:
+  rdf4j-data:
+  rdf4j-logs:
+  rdf4j-debug-workbench-data:
+  rdf4j-debug-workbench-logs:
+  authproxy-data:
