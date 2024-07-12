@@ -15,7 +15,7 @@ The service consists of:
 
 ## Usage:
 - Django Admin: Once the docker compose stack is deployed the Django admin interface is available on `localhost/admin`. You can login with the credentials you set int the `.env`.
-- For debugging purposes there's a second RDF4J running that only serves the RDF4J workbench. Some context: The RDF4J container serves both the workbench (`/rdf4j-workbench`) and the actual server (`/rdf4j-server`). Whenever the workbench has to talk to the server this is done via HTTP over the local network. Unfortunately it is not possible to set the outgoing proxy only for the server. This leads to requests from the workbench also being caught/denied by the outgoing proxy.
+- For debugging purposes there's a second RDF4J running on port `9999` that only serves the RDF4J workbench. Some context: The RDF4J container serves both the workbench (`/rdf4j-workbench`) and the actual server (`/rdf4j-server`). Whenever the workbench has to talk to the server this is done via HTTP over the local network. Unfortunately it is not possible to set the outgoing proxy only for the server. This leads to requests from the workbench also being caught/denied by the outgoing proxy.
 - [RDF4J Routes](https://rdf4j.org/documentation/reference/rest-api/) are available (Graph Store, Transactions, and Protocol are not implemented yes)
 - [GraphDB Routes](https://graphdb.ontotext.com/documentation/10.0/using-the-graphdb-rest-api.html) for repository and user management are also available
   - User management: `/rest/security/users`
