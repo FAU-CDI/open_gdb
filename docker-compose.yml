@@ -47,10 +47,10 @@ services:
       context: authproxy
     restart: always
     environment:
-      - DJANGO_SECRET_KEY=supersecret
-      - DJANGO_SUPERUSER_NAME=admin
-      - DJANGO_SUPERUSER_PASSWORD=123456789
-      - DJANGO_SUPERUSER_EMAIL=
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DJANGO_SUPERUSER_NAME=${DJANGO_SUPERUSER_NAME}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL}
     depends_on:
       - rdf4j
     volumes:
