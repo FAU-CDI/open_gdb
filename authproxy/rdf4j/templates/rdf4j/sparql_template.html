@@ -1,0 +1,58 @@
+{% load i18n admin_modify %}
+<html lang="en">
+<!-- The admin stylestheelts should probably not be included like this, but we roll for it for now -->
+<head>
+    <link rel="stylesheet" href="/static/admin/css/base.css">
+
+    <link rel="stylesheet" href="/static/admin/css/dark_mode.css">
+    <script src="/static/admin/js/theme.js" defer=""></script>
+
+
+    <link rel="stylesheet" href="/static/admin/css/nav_sidebar.css">
+    <script src="/static/admin/js/nav_sidebar.js" defer=""></script>
+
+    <link rel="stylesheet" href="/static/admin/css/forms.css">
+
+
+    <script src="/adminjsi18n/"></script>
+    <script src="/static/admin/js/vendor/jquery/jquery.js"></script>
+    <script src="/static/admin/js/jquery.init.js"></script>
+    <script src="/static/admin/js/core.js"></script>
+    <script src="/static/admin/js/admin/RelatedObjectLookups.js"></script>
+    <script src="/static/admin/js/actions.js"></script>
+    <script src="/static/admin/js/urlify.js"></script>
+    <script src="/static/admin/js/prepopulate.js"></script>
+    <script src="/static/admin/js/vendor/xregexp/xregexp.js"></script>
+
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/admin/css/responsive.css">
+    <meta name="robots" content="NONE,NOARCHIVE">
+</head>
+<form action="/{{ action }}/{{ repository_id }}" method="post">
+    {% csrf_token %}
+    {{ form }}
+    <input type="submit" value="Submit">
+</form>
+{% if result.headers %}
+    Results:
+    <table width="100%" border="0">
+        <tr>
+            {% for header in result.headers %}
+                <th>{{ header }}</th>
+            {% endfor %}
+        </tr>
+        {% for values in result.rows %}
+            <tr>
+                {% for value in values %}
+                    <td>{{ value }}</td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </table>
+{% endif %}
+{% if result.message %}
+    {{ result.message }}
+{% endif %}
+
+
