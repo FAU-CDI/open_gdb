@@ -1,0 +1,18 @@
+services:
+  # for debugging only, remove when done
+  # serves to access the workbench since the production workbench cannot access the local
+  # rdf4j-server due to the outgoing proxy catching all the requests to localhost
+  rdf4j-debug-workbench:
+    image: eclipse/rdf4j-workbench
+    restart: always
+    ports:
+      - 9999:8080
+    environment:
+      - JAVA_OPTS=-Xms1g -Xmx4g
+    volumes:
+      - rdf4j-debug-workbench-data:/var/rdf4j
+      - rdf4j-debug-workbench-logs:/usr/local/tomcat/logs
+
+volumes:
+  rdf4j-debug-workbench-data:
+  rdf4j-debug-workbench-logs:
