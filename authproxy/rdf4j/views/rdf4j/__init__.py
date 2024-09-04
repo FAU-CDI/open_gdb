@@ -1,1 +1,1 @@
-from . import repositories, sparql
+from . import repositories

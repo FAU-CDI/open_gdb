@@ -1,7 +1,7 @@
 """Urls for rdf4j"""
 
 from django.urls import path
-from .views import rdf4j, graphdb
+from .views import sparql, rdf4j, graphdb
 
 # These paths are taken from the GraphDB and RDF4J API specs
 urlpatterns = [
@@ -75,5 +75,5 @@ urlpatterns = [
     # TODO: Transactions
     # TODO: Protocol
     # Query view
-    path("<query_type>/<repository_id>", rdf4j.sparql.sparql, name="sparql"),
+    path("<query_type>/<repository_id>", sparql.sparql, name="sparql"),
 ]
