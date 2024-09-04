@@ -1,3 +1,4 @@
+from __future__ import annotations
 import functools
 import inspect
 from enum import Enum
@@ -340,29 +341,43 @@ class Query(models.Model):
 class Repository(models.Model):
     """Model representing a repository."""
 
-    DEFAULT_TEMPLATE = """
-        @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
-        @prefix config: <tag:rdf4j.org,2023:config/>.
+    class NoRemoteError(ConnectionError):
+        """Error when there's no remote for a repo"""
 
-        [] a config:Repository ;
-        config:rep.id "${slug}" ;
-        rdfs:label "${description}" ;
-        config:rep.impl [
-            config:rep.type "openrdf:SailRepository" ;
-            config:sail.impl [
-                config:sail.type "openrdf:NativeStore" ;
-                config:native.tripleIndexes "spoc,opsc,cspo"
-            ]
-        ].
-        """
+        def __init__(self, repository_id: str) -> None:
+            super().__init__(
+                f"There's no remote for Repository for: {repository_id}"
+            )
+
+    DEFAULT_TEMPLATE = """@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix config: <tag:rdf4j.org,2023:config/>.
+[] a config:Repository ;
+config:rep.id "${slug}" ;
+rdfs:label "${description}" ;
+config:rep.impl [
+    config:rep.type "openrdf:SailRepository" ;
+    config:sail.impl [
+        config:sail.type "openrdf:NativeStore" ;
+        config:native.tripleIndexes "spoc,opsc,cspo"
+    ]
+]."""
     # config:sail.iterationCacheSyncThreshold "10000";
     # config:sail.defaultQueryEvaluationMode "STANDARD";
 
     TURTLE_TEMPLATE_HELP_TEXT = """Template for the repo creation, passed though to RDF4J.
-    Available variables:
-    - ${slug}: The slug of the repo
-    - ${description}: The description of the repo
-    """
+Available variables:
+- ${slug}: The slug of the repo
+- ${description}: The description of the repo
+"""
+
+    # Map from graphDB keys to Repository field names
+    ATTRIBUTE_MAP = {
+        "id": "slug",
+        "title": "description",
+        # These are not in the graphdb spec
+        "publicRead": "public_read",
+        "publicWrite": "public_write",
+    }
 
     class Meta:
         """Define the wildcard permissions"""
@@ -372,7 +387,7 @@ class Repository(models.Model):
             ("WRITE_REPO_*", "Write to every repository"),
         ]
 
-    slug = models.CharField(max_length=255, unique=True)
+    slug = models.CharField(max_length=255, blank=False, default=None)
     description = models.TextField(null=True, default="")
     public_read = models.BooleanField(default=False)
     public_write = models.BooleanField(default=False)
@@ -432,6 +447,24 @@ class Repository(models.Model):
             slug=self.slug, description=self.description
         )
 
+    def to_dict(self) -> dict:
+        """Normalize this repository into dict."""
+        data = {}
+        for dict_key, object_key in Repository.ATTRIBUTE_MAP.items():
+            data[dict_key] = getattr(self, object_key)
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Repository:
+        # Remap attributes
+        kwargs = {}
+        for dict_key, object_key in Repository.ATTRIBUTE_MAP.items():
+            value = data.pop(dict_key, None)
+            if value:
+                kwargs[object_key] = value
+        return cls.objects.create(**kwargs)
+
+
     def size(self) -> int:
         """Get the number of triples in this repository.
 
@@ -446,12 +479,10 @@ class Repository(models.Model):
             timeout=REQUEST_TIMEOUT,
         )
         if response.status_code != 200:
-            raise Exception(
-                "Request to the remote failed, does this repo have a corresponding remote?"
-            )
+            raise Repository.NoRemoteError(self.slug)
         return int(response.text)
 
-    def create_remote(self):
+    def create_remote(self) -> None:
         """Create the corresponding repository on the RDF4J server"""
         url = f"{RDF4J_URL}{RDF4J_REPOSITORY_PATH}{self.slug}"
         headers = {"Content-Type": "text/turtle"}
@@ -460,14 +491,13 @@ class Repository(models.Model):
             url=url, data=self.to_turtle(), headers=headers, timeout=REQUEST_TIMEOUT
         )
 
-        # TODO: See if we want to keep raising these error on creation and deletion
-        # They potentially block the resolving of inconsistent state
-        # e.g. repo exists on graphdb server but not in the django environment
+        # TODO: Better error handling here... See if there are different codes
+        # and messages that are returned by rdf4j and handle them accordingly
         if response.status_code != 204:
             raise IntegrityError(f"The {self.slug} repository already has a remote!")
-        return True
+        self.has_remote = True
 
-    def delete_remote(self) -> bool:
+    def delete_remote(self) -> None:
         """Delete the corresponding repository from from the RDF4J server"""
         url = f"{RDF4J_URL}{RDF4J_REPOSITORY_PATH}{self.slug}"
         response = requests.delete(url=url, timeout=REQUEST_TIMEOUT)
@@ -476,7 +506,7 @@ class Repository(models.Model):
             raise IntegrityError(
                 f"Something went wrong while deleting the {self.slug} repo from the RDF4J server"
             )
-        return True
+        self.has_remote = False
 
     def sparql(self, sparql: str, query_type: Query.Type) -> str | dict:
         """Send a SPARQL update to the RDF4J write endpoint"""
