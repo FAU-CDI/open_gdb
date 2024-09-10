@@ -296,8 +296,10 @@ class RepoPermission(Permission):
             codename = cls.build_full_codename(permission_name, repository_id)
             if (
                 repository.public_write
-                or request.user.role in [User.Role.ADMIN, User.Role.REPO_MANAGER]
-                or request.user.has_perm(codename)
+                or not request.user.is_anonymous and (
+                    request.user.role in [User.Role.ADMIN, User.Role.REPO_MANAGER]
+                    or request.user.has_perm(codename)
+                )
             ):
                 return func(*args, **kwargs)
             return HttpResponseNotFound()
