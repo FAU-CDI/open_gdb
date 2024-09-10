@@ -7,7 +7,7 @@ from ..models import Repository
 
 
 @receiver(post_save, sender=Repository)
-def post_repo_save(instance: Repository, created = False, **kwargs) -> None:
+def post_repo_save(instance: Repository, created=False, **kwargs) -> None:
     """Routine after repo creation.
 
     Creates the repo on the RDF4J remote

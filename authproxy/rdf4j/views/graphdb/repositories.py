@@ -49,7 +49,10 @@ class RepositoriesView(View):
         #         "state": "INACTIVE"
         #     },
         # ]
-        return HttpResponse(content=json.dumps(repositories), content_type='application/json; charset=utf8')
+        return HttpResponse(
+            content=json.dumps(repositories),
+            content_type="application/json; charset=utf8",
+        )
 
     def post(self, request):
         """Create a repository in an attached RDF4J location (ttl file)"""
@@ -63,10 +66,7 @@ class RepositoriesView(View):
         try:
             Repository.from_dict(settings)
         except IntegrityError as e:
-            return ErrorResponse(
-                error=e,
-                status=400
-            )
+            return ErrorResponse(error=e, status=400)
         return HttpResponse()
 
 
@@ -88,18 +88,20 @@ class RepositoryView(View):
         """Get repository configuration as JSON or text/turtle"""
         repository = get_object_or_404(Repository, slug=repository_id)
 
-        accept = request.headers.get('Accept', None)
+        accept = request.headers.get("Accept", None)
         match accept:
             case "text/turtle":
-                headers =  {'Content-Type': "text/turtle"}
+                headers = {"Content-Type": "text/turtle"}
                 return HttpResponse(repository.to_turtle(), headers=headers)
             case "application/json":
-                return JsonResponse({
-                    "id": repository.id,
-                    "title": repository.title,
-                    "publicRead": repository.public_read,
-                    "publicWrite": repository.public_write
-                })
+                return JsonResponse(
+                    {
+                        "id": repository.id,
+                        "title": repository.title,
+                        "publicRead": repository.public_read,
+                        "publicWrite": repository.public_write,
+                    }
+                )
             case _:
                 return HttpResponseNotFound()
 

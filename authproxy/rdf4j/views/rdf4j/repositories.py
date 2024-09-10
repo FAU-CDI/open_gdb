@@ -61,7 +61,8 @@ def rdf4j_redirect(request: HttpRequest):
         # TODO: investigate the following
         # The Transfer- and Content-Encoding Header seem to cause problems:
         # Error Message:
-        #    uwsgi_response_write_body_do(): Connection reset by peer [core/writer.c line 429] during POST /repositories/test (172.18.0.7) authproxy-1  | OSError: write error
+        #    uwsgi_response_write_body_do(): Connection reset by peer [core/writer.c line 429] during
+        #    POST /repositories/test (172.18.0.7) authproxy-1  | OSError: write error
         # According to the following Stackoverflow post:
         # https://stackoverflow.com/questions/17504435/uwsgi-throws-io-error-caused-by-uwsgi-response-write-body-do-broken-pipe
         # this error stems from Django not responding to Nginx in time
@@ -93,8 +94,8 @@ class RepositoryView(View):
     def get(self, request, repository_id):
         """Execute a SPARQL query on the repository.
 
-        The result format is based on the type of result (boolean, variable bindings, or RDF data) and the negotiated acceptable content-type.
-        Note that RDF4J supports executing SPARQL queries with either a GET or a POST request.
+        The result format is based on the type of result (boolean, variable bindings, or RDF data) and the negotiated
+        acceptable content-type. Note that RDF4J supports executing SPARQL queries with either a GET or a POST request.
         POST is supported for queries that are too large to be encoded as a query parameter.
         """
         return rdf4j_redirect(request)
@@ -103,8 +104,8 @@ class RepositoryView(View):
     def post(self, request, repository_id):
         """Execute a SPARQL query on the repository.
 
-        The result format is based on the type of result (boolean, variable bindings, or RDF data) and the negotiated acceptable content-type.
-        Note that RDF4J supports executing SPARQL queries with either a GET or a POST request.
+        The result format is based on the type of result (boolean, variable bindings, or RDF data) and the negotiated
+        acceptable content-type. Note that RDF4J supports executing SPARQL queries with either a GET or a POST request.
         POST is supported for queries that are too large to be encoded as a query parameter.
         """
         return rdf4j_redirect(request)
@@ -112,8 +113,8 @@ class RepositoryView(View):
     def put(self, request, repository_id):
         """A new repository with can be created on the server by sending a PUT request to this endpoint.
 
-        The payload supplied with this request is an RDF document, containing an RDF-serialized form of a repository configuration.
-        If the repository with the specified id previously existed, the Server will refuse the request.
+        The payload supplied with this request is an RDF document, containing an RDF-serialized form of a repository
+        configuration. If the repository with the specified id previously existed, the Server will refuse the request.
         If it does not exist, a new, empty, repository will be created.
         """
         return rdf4j_redirect(request)
@@ -122,7 +123,8 @@ class RepositoryView(View):
     def delete(self, request, repository_id):
         """Delete a specific repository by ID.
 
-        Care should be taken with the use of this method: the result of this operation is the complete removal of the repository from the server, including its configuration settings and (if present) data directory
+        Care should be taken with the use of this method: the result of this operation is the complete removal of the
+        repository from the server, including its configuration settings and (if present) data directory
         """
         return rdf4j_redirect(request)
 
@@ -154,7 +156,8 @@ class StatementsView(View):
     def post(self, request, repository_id):
         """Update the data in the repository.
 
-        The data supplied with this request is expected to contain either a SPARQL 1.1 Update string, an RDF document, or a special purpose transaction document.
+        The data supplied with this request is expected to contain either a SPARQL 1.1 Update string, an RDF document,
+        or a special purpose transaction document.
         If a SPARQL 1.1 Update string is supplied, the update operation will be parsed and executed.
         If an RDF document is supplied, the statements found in the RDF document will be added to the repository.
         If a transaction document is supplied, the updates specified in the transaction document will be executed.

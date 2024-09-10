@@ -296,7 +296,8 @@ class RepoPermission(Permission):
             codename = cls.build_full_codename(permission_name, repository_id)
             if (
                 repository.public_write
-                or not request.user.is_anonymous and (
+                or not request.user.is_anonymous
+                and (
                     request.user.role in [User.Role.ADMIN, User.Role.REPO_MANAGER]
                     or request.user.has_perm(codename)
                 )
@@ -347,9 +348,7 @@ class Repository(models.Model):
         """Error when there's no remote for a repo"""
 
         def __init__(self, repository_id: str) -> None:
-            super().__init__(
-                f"There's no remote for Repository for: {repository_id}"
-            )
+            super().__init__(f"There's no remote for Repository for: {repository_id}")
 
     DEFAULT_TEMPLATE = """@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 @prefix config: <tag:rdf4j.org,2023:config/>.
@@ -465,7 +464,6 @@ Available variables:
             if value:
                 kwargs[object_key] = value
         return cls.objects.create(**kwargs)
-
 
     def size(self) -> int:
         """Get the number of triples in this repository.
