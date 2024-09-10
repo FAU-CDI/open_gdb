@@ -131,3 +131,6 @@ RDF4J_URL = "http://rdf4j:8080/rdf4j-server/"  # use this for compose deployment
 # RDF4J_URL = "http://localhost:8080/rdf4j-server/" # use this for local deployment
 RDF4J_REPOSITORY_PATH = "repositories/"
 REQUEST_TIMEOUT = 5
+
+# Set max upload size to 100MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600
