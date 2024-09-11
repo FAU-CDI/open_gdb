@@ -21,6 +21,7 @@ services:
         - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
 
   outproxy:
+    image: ghcr.io/fau-cdi/open_gdb_outproxy:latest
     build:
       context: outproxy
     restart: always
@@ -28,6 +29,7 @@ services:
       - rdf4j
 
   authproxy:
+    image: ghcr.io/fau-cdi/open_gdb_authproxy:latest
     build:
       context: authproxy
     restart: always
