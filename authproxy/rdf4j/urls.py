@@ -1,13 +1,16 @@
 """Urls for rdf4j"""
 
-from django.urls import path
-from .views import sparql, rdf4j, graphdb
+from django.urls import path, reverse_lazy
+from django.views.generic.base import RedirectView
+
+from .views import graphdb, rdf4j, sparql
 
 # These paths are taken from the GraphDB and RDF4J API specs
 urlpatterns = [
     # -----------------
     # -- RDF4J Paths --
     # -----------------
+    path("", RedirectView.as_view(url=reverse_lazy('admin:index'))),
     # /repositories
     path("repositories", rdf4j.repositories.repositories, name="repositories"),
     path(
