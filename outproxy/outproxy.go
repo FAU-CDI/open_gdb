@@ -67,6 +67,15 @@ func IsLocal(ip net.IP) bool {
 		net.IP.IsPrivate(ip)
 }
 
+// IsLocalOrIPv6 checks if the given IP is a local IP address or a IPv6 address and returns true when it is, false otherwise.
+func IsLocalOrIPv6(ip net.IP) bool {
+	// Return true if IPv6
+	if ip.To4() == nil {
+		return true
+	}
+	return IsLocal(ip)
+}
+
 var restrictedError error
 
 func init() {

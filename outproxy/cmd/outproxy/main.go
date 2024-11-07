@@ -11,7 +11,7 @@ import (
 
 func main() {
 	options := outproxy.Options{
-		Filter:  outproxy.IsLocal,
+		Filter:  outproxy.IsLocalOrIPv6,
 		Lookup:  net.LookupIP,
 		Timeout: timeout,
 	}
