@@ -2,7 +2,6 @@ package outproxy
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -11,49 +10,79 @@ import (
 	"github.com/elazarl/goproxy"
 )
 
+// Options describes options for creating an outproxy instance.
 type Options struct {
-	Filter  func(ip net.IP) bool                // The filter function for IP addresses. Should return true when IP is supposed to be blocked.
-	Lookup  func(host string) ([]net.IP, error) // DNS lookup function.
-	Timeout time.Duration                       // Dial up timeout.
+	// Filter is a non-nil function to filter ip addresses to be permitted.
+	Filter func(ip net.IP) bool
+
+	// Lookup is used to resolve a hostname into an ip address.
+	// When nil, uses [net.LookupIP].
+	Lookup func(host string) ([]net.IP, error)
+
+	// Timeout is the default timeout to use when attempting to dial a specific ip address.
+	// NOTE: If a host resolves to multiple ip addresses, the timeout is applied to each.
+	Timeout time.Duration
 }
 
+// resolve uses the Lookup function, or defaults to [net.LookupIP] when nil.
+func (options Options) resolve(host string) ([]net.IP, error) {
+	if options.Lookup == nil {
+		return net.LookupIP(host)
+	}
+	return options.Lookup(host)
+}
+
+// MakeProxy creates a new proxy based on options
 func MakeProxy(options Options) *goproxy.ProxyHttpServer {
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = true
 
 	proxy.Tr = &http.Transport{
 		Dial: func(network, addr string) (net.Conn, error) {
-			log.Println("Dial", addr)
+			// resolve into host and port
 			host, port, _ := net.SplitHostPort(addr)
 
-			ips, err := options.Lookup(host)
+			// find all the ips
+			ips, err := options.resolve(host)
 			if err != nil {
 				return nil, err
 			}
 
-			ip, err := filterIp(ips, options.Filter)
-			if err != nil {
-				return nil, err
+			// filter the ips to only contain the allowed ones
+			n := 0
+			for _, ip := range ips {
+				if options.Filter(ip) {
+					continue
+				}
+				ips[n] = ip
+				n++
+			}
+			ips = ips[:n]
+
+			// no ips allowed, or nothing resolved
+			if n == 0 {
+				return nil, restrictedError
 			}
 
-			return net.DialTimeout(network, net.JoinHostPort(ip.String(), port), options.Timeout)
+			// shuffle the ips around
+			rand.Shuffle(len(ips), func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
+
+			// try to dial each of the ips
+			for _, ip := range ips {
+				var conn net.Conn
+
+				// if we successfully dial, return the connection
+				conn, err = net.DialTimeout(network, net.JoinHostPort(ip.String(), port), options.Timeout)
+				if err == nil {
+					return conn, err
+				}
+			}
+
+			// return the last error
+			return nil, err
 		},
 	}
 	return proxy
-}
-
-// filterIp filters the given IP addresses with the filter function and randomly returns one that passes the filter.
-// ips is the list of IPs to filter.
-// filter is the filter function and should return true if the IP should be blocked.
-func filterIp(ips []net.IP, filter func(ip net.IP) bool) (net.IP, error) {
-	// Random shuffle to redirect requests to every valid IP.
-	rand.Shuffle(len(ips), func(i, j int) { ips[i], ips[j] = ips[j], ips[i] })
-	for _, ip := range ips {
-		if ip != nil && !filter(ip) {
-			return ip, nil
-		}
-	}
-	return nil, restrictedError
 }
 
 // IsLocal checks if the given IP is a local IP address and returns true when it is, false otherwise.
