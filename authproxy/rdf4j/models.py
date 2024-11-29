@@ -539,9 +539,9 @@ Available variables:
             size_after = self.size()
             return_data["message"] = f"Affected triples: {size_after - size_before}"
         if query_type == Query.Type.QUERY.value:
-            string = response.text.split()
-            headers, rows = string[0].split(","), list(
-                map(lambda x: x.split(","), string[1:])
+            string = response.text.split('\r')
+            headers, rows = string[0].split(",", 2), list(
+                map(lambda x: x.split(",", 2), string[1:])
             )
             return_data["headers"] = headers
             return_data["rows"] = rows
