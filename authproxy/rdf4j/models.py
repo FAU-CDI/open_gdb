@@ -359,7 +359,7 @@ config:rep.impl [
     config:rep.type "openrdf:SailRepository" ;
     config:sail.impl [
         config:sail.type "openrdf:NativeStore" ;
-        config:native.tripleIndexes "spoc,opsc,cspo"
+        config:native.tripleIndexes "spoc,posc,cspo"
     ]
 ]."""
     # config:sail.iterationCacheSyncThreshold "10000";
