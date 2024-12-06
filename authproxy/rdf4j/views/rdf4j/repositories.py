@@ -7,12 +7,11 @@ We have to create a view for every /repository route here and check for the nece
 
 import urllib3
 
-from django.utils.decorators import method_decorator
-from django.views import View
-from django.views.decorators.csrf import csrf_exempt
 from django.utils.http import urlencode
-
 from django.http import StreamingHttpResponse, HttpRequest
+
+from rest_framework.decorators import api_view
+from rest_framework.views import APIView
 
 from authproxy.settings import RDF4J_URL, REQUEST_TIMEOUT
 from ...models import RepoPermission
@@ -34,60 +33,37 @@ def rdf4j_redirect(request: HttpRequest):
     if query_params:
         url += "?" + urlencode(query_params)
 
+    # For some reason we have to remove the "Content-Length" header, otherwise RDF4J complains
+    bad_headers = ["Content-Length"]
+    headers = {header: value for header, value in dict(request.headers).items() if header not in bad_headers}
+
     # Forward the request to RDF4J
     rdf4j_response = urllib3.request(
         url=url,
         body=request.body,
         method=request.method,
-        headers=dict(request.headers),
+        headers=headers,
         timeout=REQUEST_TIMEOUT,
         preload_content=False,  # stream the request
     )
 
-    response = StreamingHttpResponse(streaming_content=rdf4j_response)
-
-    # Pass through the headers from the RDF4J response
-    # These are:
-    # Vary
-    # Content-Disposition
-    # Content-Encoding
-    # Content-Type
-    # Content-Language
-    # Transfer-Encoding
-    # Date
-    # Keep-Alive
-    # Connection
-    for key in rdf4j_response.headers:
-        # TODO: investigate the following
-        # The Transfer- and Content-Encoding Header seem to cause problems:
-        # Error Message:
-        #    uwsgi_response_write_body_do(): Connection reset by peer [core/writer.c line 429] during
-        #    POST /repositories/test (172.18.0.7) authproxy-1  | OSError: write error
-        # According to the following Stackoverflow post:
-        # https://stackoverflow.com/questions/17504435/uwsgi-throws-io-error-caused-by-uwsgi-response-write-body-do-broken-pipe
-        # this error stems from Django not responding to Nginx in time
-        # For now skip these headers since they cause problems
-        if key not in ["Transfer-Encoding", "Content-Encoding"]:
-            response[key] = rdf4j_response.headers[key]
-
-    return response
+    return StreamingHttpResponse(streaming_content=rdf4j_response)
 
 
-@csrf_exempt
+@api_view(["GET"])
 def index(request):
     """Render the SwaggerUI api reference"""
     # TODO: show SwaggerUI api reference here.
     return rdf4j_redirect(request)
 
 
-@csrf_exempt
+@api_view(["GET"])
 def repositories(request):
     """View for the /repositories route"""
     return rdf4j_redirect(request)
 
 
-@method_decorator(csrf_exempt, name="dispatch")
-class RepositoryView(View):
+class RepositoryView(APIView):
     """View for the /repositories/{repository_id}"""
 
     @RepoPermission.read
@@ -129,22 +105,21 @@ class RepositoryView(View):
         return rdf4j_redirect(request)
 
 
-@csrf_exempt
+@api_view(["GET"])
 @RepoPermission.read
 def repository_size(request, repository_id):
     """View for the /repositories/{repository_id}/size route"""
     return rdf4j_redirect(request)
 
 
-@csrf_exempt
+@api_view(["GET"])
 @RepoPermission.read
 def repository_contexts(request, repository_id):
     """View for the /repositories/{repository_id}/contexts route"""
     return rdf4j_redirect(request)
 
 
-@method_decorator(csrf_exempt, name="dispatch")
-class StatementsView(View):
+class StatementsView(APIView):
     """View for the /repositories/{repository_id}/statements"""
 
     @RepoPermission.read
@@ -175,8 +150,7 @@ class StatementsView(View):
         return rdf4j_redirect(request)
 
 
-@method_decorator(csrf_exempt, name="dispatch")
-class NamespacesView(View):
+class NamespacesView(APIView):
     """View for the /repositories/{repository_id}/namespaces"""
 
     @RepoPermission.read
@@ -190,8 +164,7 @@ class NamespacesView(View):
         return rdf4j_redirect(request)
 
 
-@method_decorator(csrf_exempt, name="dispatch")
-class NamespacesPrefixView(View):
+class NamespacesPrefixView(APIView):
     """View for the /repositories/{repository_id}/namespaces/{namespaces_prefix}"""
 
     @RepoPermission.read

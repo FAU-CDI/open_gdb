@@ -39,6 +39,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    'rest_framework',
+    'rest_framework.authtoken',
 ]
 
 MIDDLEWARE = [
@@ -49,8 +51,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "rdf4j.middleware.BasicAuthMiddleware",
-    # 'rdf4j.middleware.AuthorizationMiddleware',
 ]
 
 ROOT_URLCONF = "authproxy.urls"
@@ -131,6 +131,14 @@ RDF4J_URL = "http://rdf4j:8080/rdf4j-server/"  # use this for compose deployment
 # RDF4J_URL = "http://localhost:8080/rdf4j-server/" # use this for local deployment
 RDF4J_REPOSITORY_PATH = "repositories/"
 REQUEST_TIMEOUT = 5
+LOGIN_URL = "/admin"
 
 # Set max upload size to 100MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ]
+}

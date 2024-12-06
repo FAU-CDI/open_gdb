@@ -2,25 +2,18 @@
 
 import json
 
-from django.http import HttpResponse, JsonResponse, HttpResponseNotFound
-from django.views import View
-from django.views.decorators.csrf import csrf_exempt
-
-from django.utils.decorators import method_decorator
-from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import permission_required
 from django.db.utils import IntegrityError
-
+from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
+from rest_framework.decorators import api_view
+from rest_framework.views import APIView
 
 from ...models import User
 
 
-# TODO: remove the CSRF exempt stuff when done testing
-
-
-@csrf_exempt
-@require_http_methods(["GET"])
+@api_view(["GET"])
 @permission_required("admin.view_user")
 def users(request):
     """
@@ -36,8 +29,7 @@ def users(request):
     return JsonResponse(response_data)
 
 
-@method_decorator(csrf_exempt, name="dispatch")
-class UsersView(View):
+class UsersView(APIView):
     """Views for the /rest/security/users/** routes"""
 
     @method_decorator(permission_required("admin.delete_user"))

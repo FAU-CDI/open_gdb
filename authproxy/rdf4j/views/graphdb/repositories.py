@@ -2,17 +2,12 @@
 
 import json
 
-from django.views import View
-
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-
-from django.views.decorators.http import require_http_methods
 from django.db.utils import IntegrityError
-
 from django.shortcuts import get_object_or_404
-
 from django.http import HttpResponse, JsonResponse, HttpResponseNotFound
+
+from rest_framework.views import APIView
+from rest_framework.decorators import api_view
 
 from ...models import Repository
 from .. import ErrorResponse
@@ -23,8 +18,7 @@ def dummy_redirect(request):
     return HttpResponse(f"Method: {request.method} on {request.path}, ")
 
 
-@method_decorator(csrf_exempt, name="dispatch")
-class RepositoriesView(View):
+class RepositoriesView(APIView):
     """Views for /rest/repositories"""
 
     def get(self, request):
@@ -70,8 +64,7 @@ class RepositoriesView(View):
         return HttpResponse()
 
 
-@method_decorator(csrf_exempt, name="dispatch")
-class RepositoryView(View):
+class RepositoryView(APIView):
     """Views for /rest/repositories/{repositoryID}"""
 
     def delete(self, request, repository_id: str):
@@ -112,8 +105,7 @@ class RepositoryView(View):
         return dummy_redirect(request)
 
 
-@csrf_exempt
-@require_http_methods(["POST"])
+@api_view(["POST"])
 def restart(request, repository_id: str):
     """Restart a repository"""
     # TODO: figure out how this is supposed to work...
@@ -121,8 +113,7 @@ def restart(request, repository_id: str):
     return dummy_redirect(request)
 
 
-@csrf_exempt
-@require_http_methods(["GET"])
+@api_view(["GET"])
 def size(request, repository_id: str):
     """Get repository size"""
 
