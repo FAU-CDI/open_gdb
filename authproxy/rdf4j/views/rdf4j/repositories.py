@@ -33,21 +33,32 @@ def rdf4j_redirect(request: HttpRequest):
     if query_params:
         url += "?" + urlencode(query_params)
 
-    # For some reason we have to remove the "Content-Length" header, otherwise RDF4J complains
-    bad_headers = ["Content-Length"]
-    headers = {header: value for header, value in dict(request.headers).items() if header not in bad_headers}
-
     # Forward the request to RDF4J
     rdf4j_response = urllib3.request(
         url=url,
         body=request.body,
         method=request.method,
-        headers=headers,
+        headers=dict(request.headers),
         timeout=REQUEST_TIMEOUT,
         preload_content=False,  # stream the request
     )
 
-    return StreamingHttpResponse(streaming_content=rdf4j_response)
+    response = StreamingHttpResponse(streaming_content=rdf4j_response)
+    # Set the headers in the response
+    for key in rdf4j_response.headers:
+        # TODO: investigate the following
+        # The Transfer- and Content-Encoding Header seem to cause problems:
+        # Error Message:
+        #    uwsgi_response_write_body_do(): Connection reset by peer [core/writer.c line 429] during
+        #    POST /repositories/test (172.18.0.7) authproxy-1  | OSError: write error
+        # According to the following Stackoverflow post:
+        # https://stackoverflow.com/questions/17504435/uwsgi-throws-io-error-caused-by-uwsgi-response-write-body-do-broken-pipe
+        # this error stems from Django not responding to Nginx in time
+        # For now skip these headers since they cause problems
+        if key not in ["Transfer-Encoding", "Content-Encoding"]:
+            response[key] = rdf4j_response.headers[key]
+
+    return response
 
 
 @api_view(["GET"])
