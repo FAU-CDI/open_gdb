@@ -1,7 +1,7 @@
 asgiref==3.8.1
 astroid==3.1.0
 black==24.4.1
-certifi==2024.2.2
+certifi==2024.07.04
 charset-normalizer==3.3.2
 click==8.1.7
 dill==0.3.8
@@ -20,9 +20,9 @@ pylint==3.1.0
 pyparsing==3.1.2
 pytest==8.2.0
 PyYAML==6.0.1
-requests==2.31.0
-setuptools==68.2.2
+requests==2.32.0
+setuptools>=70.0.0
 sqlparse==0.5.0
 tomlkit==0.12.4
-urllib3==2.2.1
+urllib3==2.2.2
 wheel==0.41.2
