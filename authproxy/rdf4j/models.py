@@ -524,25 +524,29 @@ Available variables:
             url = f"{RDF4J_URL}{RDF4J_REPOSITORY_PATH}{self.slug}"
             content_type = "application/sparql-query"
 
-        headers = {"Content-Type": content_type}
+        headers = {
+            "Content-Type": content_type,
+            "Accept": "application/sparql-results+json"
+        }
 
         response = requests.post(
             url=url, data=sparql, headers=headers, timeout=REQUEST_TIMEOUT
         )
 
-        return_data = {}
         if response.status_code != 200:
-            return_data["message"] = response.text
-            return return_data
+            return {"message": response.text}
 
         if query_type == Query.Type.UPDATE.value:
             size_after = self.size()
-            return_data["message"] = f"Affected triples: {size_after - size_before}"
+            return {"message": f"Affected triples: {size_after - size_before}"}
         if query_type == Query.Type.QUERY.value:
-            string = response.text.split('\r')
-            headers, rows = string[0].split(",", 2), list(
-                map(lambda x: x.split(",", 2), string[1:])
-            )
-            return_data["headers"] = headers
-            return_data["rows"] = rows
-        return return_data
+
+            def preprocess_data(data):
+                headers = data["head"]["vars"]
+                for binding in data["results"]["bindings"]:
+                    binding["row"] = [binding.get(header, {}).get("value", "") for header in headers]
+                return data
+
+            return preprocess_data(response.json())
+
+        return {}

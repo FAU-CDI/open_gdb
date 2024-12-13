@@ -34,21 +34,21 @@
     {{ form }}
     <input type="submit" value="Submit">
 </form>
-{% if result.headers %}
+{% if result.head %}
     Results:
     <table width="100%" border="0">
+    <tr>
+        {% for header in result.head.vars %}
+            <th>{{ header }}</th>
+        {% endfor %}
+    </tr>
+    {% for binding in result.results.bindings %}
         <tr>
-            {% for header in result.headers %}
-                <th>{{ header }}</th>
+            {% for value in binding.row %}
+                <td>{{ value }}</td>
             {% endfor %}
         </tr>
-        {% for values in result.rows %}
-            <tr>
-                {% for value in values %}
-                    <td>{{ value }}</td>
-                {% endfor %}
-            </tr>
-        {% endfor %}
+    {% endfor %}
     </table>
 {% endif %}
 {% if result.message %}
