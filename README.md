@@ -1,4 +1,5 @@
 # Open GDB
+
 Implementation of graph database including user and repository management based on RDF4J.
 
 ## Architecture:
@@ -30,7 +31,7 @@ To see what's going on in the actual RDF4J server you have to set the `RDF4J-Ser
 - [RDF4J Routes](https://rdf4j.org/documentation/reference/rest-api/) are available (Graph Store, Transactions, and Protocol are not implemented yet)
 - [GraphDB Routes](https://graphdb.ontotext.com/documentation/10.0/using-the-graphdb-rest-api.html) for repository and user management are also available
   - User management: `/rest/security/users`
-  - Repository managent: `/rest/repositories/`
+  - Repository management: `/rest/repositories/`
 
 ### Token authentication:
 #### DISCLAIMER: Only use the token authentication if you are deploying `open_gdb` over HTTPS!
