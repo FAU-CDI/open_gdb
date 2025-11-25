@@ -140,5 +140,6 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.BasicAuthentication',
-    ]
+    ],
+    'DEFAULT_CONTENT_NEGOTIATION_CLASS': 'rdf4j.negotiation.IgnoreClientContentNegotiation'
 }
