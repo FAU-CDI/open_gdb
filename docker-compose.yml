@@ -11,6 +11,10 @@ services:
   nginx:
     image: nginxinc/nginx-unprivileged:latest
     restart: always
+    environment:
+      AUTHPROXY_HOSTNAME: authproxy
+      RDF4J_HOSTNAME: rdf4j
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx
     depends_on:
       - rdf4j
       - authproxy
@@ -18,7 +22,7 @@ services:
     ports:
       - ${PUBLIC_PORT}:80
     volumes:
-        - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+        - ./nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template
 
   outproxy:
     image: ghcr.io/fau-cdi/open_gdb_outproxy:latest
@@ -34,12 +38,13 @@ services:
       context: authproxy
     restart: always
     environment:
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-      - DJANGO_SUPERUSER_NAME=${DJANGO_SUPERUSER_NAME}
-      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
-      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL}
-      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS}
-      - DJANGO_CSRF_TRUSTED_ORIGINS=${DJANGO_CSRF_TRUSTED_ORIGINS}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_SUPERUSER_NAME: ${DJANGO_SUPERUSER_NAME}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD}
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS}
+      RDF4J_HOSTNAME: rdf4j
     depends_on:
       - rdf4j
     volumes:

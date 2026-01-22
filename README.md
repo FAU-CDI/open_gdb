@@ -66,5 +66,19 @@ headers = { "Authorization": f"Token {token}"}
 api_response = requests.get("https://ts.my-domain.com/repositories", headers=headers)
 ```
 
+### Changing service names
+In case you need to change the service/container names for the docker-compose project for whatever reason, you have to change the following:
+
+- `rdf4j`:
+    - Adjust `depends_on` and the `RDF4J_HOSTNAME` env variable in `nginx` and `authproxy` services
+    - Adjust `depends_on` in `outproxy`
+- `nginx`: Can just be renamed
+- `authproxy`:
+    - Adjust `depends_on` and the `AUTHPROXY_HOSTNAME` env variable in `nginx` service
+- `outproxy`:
+    - Adjust the `-Dhttp.proxyHost` and `-Dhttps.proxyHost` flags in the `JAVA_OPTS` in `rdf4j` service
+    - Adjust `depends_on` in `nginx` service
+
+
 ## Future development:
 - Ideally we want to make this a drop in replacement for the GraphBB server that also works with the standalone [GraphDB Workbench](https://github.com/Ontotext-AD/graphdb-workbench)

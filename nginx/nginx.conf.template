@@ -47,8 +47,8 @@ http {
         # Set the upstream locations as variables.
         # This forces nginx to re-resolve DNS at request time.
         # See https://archive.is/gAdBR.
-        set $authproxy authproxy:8000;
-        set $rdf4j rdf4j:8080; 
+        set $authproxy ${AUTHPROXY_HOSTNAME}:8000;
+        set $rdf4j ${RDF4J_HOSTNAME}:8080; 
 
         # the homepage redirects to the auth proxy
         location / {

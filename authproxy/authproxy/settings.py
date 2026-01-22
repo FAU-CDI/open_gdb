@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -39,8 +40,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'rest_framework',
-    'rest_framework.authtoken',
+    "rest_framework",
+    "rest_framework.authtoken",
 ]
 
 MIDDLEWARE = [
@@ -127,7 +128,10 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Custom configs
-RDF4J_URL = "http://rdf4j:8080/rdf4j-server/"  # use this for compose deployment
+RDF4J_HOSTNAME = os.environ.setdefault("RDF4J_HOSTNAME", "rdf4j")
+RDF4J_URL = (
+    f"http://{RDF4J_HOSTNAME}:8080/rdf4j-server/"  # use this for compose deployment
+)
 # RDF4J_URL = "http://localhost:8080/rdf4j-server/" # use this for local deployment
 RDF4J_REPOSITORY_PATH = "repositories/"
 REQUEST_TIMEOUT = 5
@@ -137,9 +141,9 @@ LOGIN_URL = "/admin"
 DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
     ],
-    'DEFAULT_CONTENT_NEGOTIATION_CLASS': 'rdf4j.negotiation.IgnoreClientContentNegotiation'
+    "DEFAULT_CONTENT_NEGOTIATION_CLASS": "rdf4j.negotiation.IgnoreClientContentNegotiation",
 }
