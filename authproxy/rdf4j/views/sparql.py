@@ -5,7 +5,9 @@ from ..forms import QueryForm
 
 from ..models import Repository, Query
 
+from django.contrib.auth.decorators import login_required
 
+@login_required
 def sparql(
     request: HttpRequest, query_type: Query.Type, repository_id: str
 ) -> HttpResponse:
