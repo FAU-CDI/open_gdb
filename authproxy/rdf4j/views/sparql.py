@@ -3,11 +3,23 @@ from django.shortcuts import render
 
 from ..forms import QueryForm
 
-from ..models import Repository, Query
+from ..models import Repository, RepoPermission, Query
 
 from django.contrib.auth.decorators import login_required
 
+
+@RepoPermission.read
 @login_required
+def query(request: HttpRequest, repository_id: str) -> HttpResponse:
+    return sparql(request, Query.Type.QUERY, repository_id)
+
+
+@RepoPermission.write
+@login_required
+def update(request: HttpRequest, repository_id: str) -> HttpResponse:
+    return sparql(request, Query.Type.UPDATE, repository_id)
+
+
 def sparql(
     request: HttpRequest, query_type: Query.Type, repository_id: str
 ) -> HttpResponse:

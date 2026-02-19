@@ -10,7 +10,7 @@ urlpatterns = [
     # -----------------
     # -- RDF4J Paths --
     # -----------------
-    path("", RedirectView.as_view(url=reverse_lazy('admin:index'))),
+    path("", RedirectView.as_view(url=reverse_lazy("admin:index"))),
     # /repositories
     path("repositories", rdf4j.repositories.repositories, name="repositories"),
     path(
@@ -78,5 +78,6 @@ urlpatterns = [
     # TODO: Transactions
     # TODO: Protocol
     # Query view
-    path("<query_type>/<repository_id>", sparql.sparql, name="sparql"),
+    path("query/<repository_id>", sparql.query, name="query"),
+    path("update/<repository_id>", sparql.update, name="update"),
 ]
