@@ -99,10 +99,18 @@ class RepositoryView(APIView):
                 return HttpResponseNotFound()
 
     def put(self, request, repository_id: str):
-        """Edit repository configuration"""
-        # TODO: figure out how this is supposed to work...
-        # RDF4J does not feature a route to edit repository settings
-        return dummy_redirect(request)
+        """Edit repository configuration (publicRead, publicWrite, title)."""
+        repository = get_object_or_404(Repository, slug=repository_id)
+        try:
+            settings = json.loads(request.body.decode("utf-8"))
+        except json.decoder.JSONDecodeError as e:
+            return ErrorResponse(status=400, error=e)
+
+        for dict_key, object_key in Repository.ATTRIBUTE_MAP.items():
+            if dict_key in settings:
+                setattr(repository, object_key, settings[dict_key])
+        repository.save()
+        return HttpResponse(status=204)
 
 
 @api_view(["POST"])
