@@ -13,7 +13,6 @@ services:
     restart: always
     environment:
       AUTHPROXY_HOSTNAME: authproxy
-      RDF4J_HOSTNAME: rdf4j
       NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx
     depends_on:
       - rdf4j

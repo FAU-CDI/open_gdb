@@ -48,24 +48,11 @@ http {
         # This forces nginx to re-resolve DNS at request time.
         # See https://archive.is/gAdBR.
         set $authproxy ${AUTHPROXY_HOSTNAME}:8000;
-        set $rdf4j ${RDF4J_HOSTNAME}:8080; 
 
         # the homepage redirects to the auth proxy
         location / {
             proxy_pass http://$authproxy;
             proxy_redirect http://$authproxy/ $scheme://$host/;
-        }
-
-        # the rdf4j workbench is passed through directly to rdf4j
-        location /rdf4j-workbench {
-            proxy_pass http://$rdf4j/rdf4j-workbench;
-            proxy_redirect http://$rdf4j/rdf4j-workbench/ $scheme://$host/;
-        }
-
-        # 
-        location /rdf4j-server {
-            proxy_pass http://$rdf4j/rdf4j-server;
-            proxy_redirect http://$rdf4j/rdf4j-server/ $scheme://$host/;
         }
     }
 }
