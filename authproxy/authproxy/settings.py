@@ -135,7 +135,7 @@ RDF4J_URL = (
 # RDF4J_URL = "http://localhost:8080/rdf4j-server/" # use this for local deployment
 RDF4J_REPOSITORY_PATH = "repositories/"
 # Request timeout for requests to the rdf4j backend in s.
-REQUEST_TIMEOUT = os.environ.get("RDF4J_TIMEOUT", 5)
+REQUEST_TIMEOUT = int(os.environ.get("RDF4J_TIMEOUT", 5))
 LOGIN_URL = "/admin"
 
 # Set max upload size to 100MB
