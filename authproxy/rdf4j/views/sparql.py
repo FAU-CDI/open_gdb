@@ -20,20 +20,18 @@ def update(request: HttpRequest, repository_id: str) -> HttpResponse:
     return sparql(request, Query.Type.UPDATE, repository_id)
 
 
-def sparql(
-    request: HttpRequest, query_type: Query.Type, repository_id: str
-) -> HttpResponse:
+def sparql(request: HttpRequest, query_type: str, repository_id: str) -> HttpResponse:
     """Send a sparql query to the RDF4J endpoint"""
     result = "No result"
     if request.method == "POST":
         form = QueryForm(request.POST)
         if form.is_valid():
             query = form.cleaned_data["sparql"]
-            # try:
             repository = Repository.objects.get(slug=repository_id)
-            result = repository.sparql(query, query_type)
-            # except TypeError as e:
-            #     return HttpResponse(str(e))
+            try:
+                result = repository.sparql(query, Query.Type(query_type))
+            except ValueError as e:
+                return HttpResponse(str(e).encode(encoding="utf-8"))
     else:
         form = QueryForm()
 

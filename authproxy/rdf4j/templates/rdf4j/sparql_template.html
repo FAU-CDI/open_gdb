@@ -29,7 +29,7 @@
     <link rel="stylesheet" href="/static/admin/css/responsive.css">
     <meta name="robots" content="NONE,NOARCHIVE">
 </head>
-<form action="/{{ action }}/{{ repository_id }}" method="post">
+<form action="/{{ action.value }}/{{ repository_id }}" method="post">
     {% csrf_token %}
     {{ form }}
     <input type="submit" value="Submit">

@@ -513,20 +513,20 @@ Available variables:
         if query_type not in Query.Type:
             raise TypeError(f"Unknown sparql query type: {query_type}")
 
-        if query_type == Query.Type.UPDATE.value:
+        if query_type == Query.Type.UPDATE:
             url = f"{RDF4J_URL}{RDF4J_REPOSITORY_PATH}{self.slug}/statements"
             content_type = "application/sparql-update"
             try:
                 size_before = self.size()
             except Exception as e:
                 raise NotImplementedError("Do error handling here") from e
-        elif query_type == Query.Type.QUERY.value:
+        elif query_type == Query.Type.QUERY:
             url = f"{RDF4J_URL}{RDF4J_REPOSITORY_PATH}{self.slug}"
             content_type = "application/sparql-query"
 
         headers = {
             "Content-Type": content_type,
-            "Accept": "application/sparql-results+json"
+            "Accept": "application/sparql-results+json",
         }
 
         response = requests.post(
@@ -536,17 +536,17 @@ Available variables:
         if response.status_code != 200:
             return {"message": response.text}
 
-        if query_type == Query.Type.UPDATE.value:
+        if query_type == Query.Type.UPDATE:
             size_after = self.size()
             return {"message": f"Affected triples: {size_after - size_before}"}
-        if query_type == Query.Type.QUERY.value:
+        if query_type == Query.Type.QUERY:
 
             def preprocess_data(data):
                 headers = data["head"]["vars"]
                 for binding in data["results"]["bindings"]:
-                    binding["row"] = [binding.get(header, {}).get("value", "") for header in headers]
+                    binding["row"] = [
+                        binding.get(header, {}).get("value", "") for header in headers
+                    ]
                 return data
 
             return preprocess_data(response.json())
-
-        return {}
