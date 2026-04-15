@@ -44,6 +44,7 @@ services:
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS}
       RDF4J_HOSTNAME: rdf4j
+      RDF4J_TIMEOUT: ${RDF4J_TIMEOUT:-5}
     depends_on:
       - rdf4j
     volumes:
