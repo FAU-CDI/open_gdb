@@ -347,8 +347,20 @@ class Repository(models.Model):
     class NoRemoteError(ConnectionError):
         """Error when there's no remote for a repo"""
 
-        def __init__(self, repository_id: str) -> None:
-            super().__init__(f"There's no remote for Repository for: {repository_id}")
+        def __init__(
+                self,
+                repository_id: str,
+                status_code: int | None = None,
+                detail: str = "",
+        ) -> None:
+            parts = [f"RDF4J size request failed for repository {repository_id!r}"]
+            if status_code is not None:
+                parts.append(f"HTTP {status_code}")
+            if detail:
+                parts.append(detail)
+            super().__init__(": ".join(parts))
+            self.repository_id = repository_id
+            self.status_code = status_code
 
     DEFAULT_TEMPLATE = """@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 @prefix config: <tag:rdf4j.org,2023:config/>.
@@ -469,18 +481,27 @@ Available variables:
         """Get the number of triples in this repository.
 
         Raises:
-            Exception: When the request to the remote RDF4J server fails.
+            Repository.NoRemoteError: When the RDF4J request fails or the body is not an integer.
 
         Returns:
             int: The number of triples in this repo.
         """
-        response = requests.get(
-            url=f"{RDF4J_URL}{RDF4J_REPOSITORY_PATH}{self.slug}/size",
-            timeout=REQUEST_TIMEOUT,
-        )
+        url = f"{RDF4J_URL}{RDF4J_REPOSITORY_PATH}{self.slug}/size"
+        try:
+            response = requests.get(url=url, timeout=REQUEST_TIMEOUT)
+        except requests.RequestException as e:
+            raise Repository.NoRemoteError(self.slug, None, str(e)) from e
+            body = (response.text or "")[:500]
         if response.status_code != 200:
-            raise Repository.NoRemoteError(self.slug)
-        return int(response.text)
+            raise Repository.NoRemoteError(self.slug, response.status_code, body)
+        try:
+            return int(response.text.strip())
+        except ValueError as e:
+            raise Repository.NoRemoteError(
+                self.slug,
+                response.status_code,
+                f"invalid size payload: {(response.text or '')[:200]!r}",
+            ) from e
 
     def create_remote(self) -> None:
         """Create the corresponding repository on the RDF4J server"""
