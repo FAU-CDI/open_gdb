@@ -87,7 +87,7 @@ class RepositoryView(APIView):
         """
         return rdf4j_redirect(request)
 
-    @RepoPermission.write
+    @RepoPermission.read
     def post(self, request, repository_id):
         """Execute a SPARQL query on the repository.
 
