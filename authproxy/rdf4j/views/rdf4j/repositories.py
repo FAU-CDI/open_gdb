@@ -58,6 +58,8 @@ def rdf4j_redirect(request: HttpRequest):
         if key not in ["Transfer-Encoding", "Content-Encoding"]:
             response[key] = rdf4j_response.headers[key]
 
+    response.status_code = rdf4j_response.status
+
     return response
 
 
