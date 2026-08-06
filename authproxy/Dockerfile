@@ -18,21 +18,10 @@ RUN apk add --no-cache \
 
 ADD docker/uwsgi.ini /app/uwsgi.ini
 
-# Add requirements and install dependencies
-ADD requirements.txt /app/
-ADD requirements-prod.txt /app/
+# Install Django app and its production dependencies
+ADD . /app/
 WORKDIR /app/
-
-# install all the python runtime dependencies
-RUN mkdir -p /var/www/static/ \
-    && pip install -r requirements.txt \
-    && pip install -r requirements-prod.txt
-
-# Install Django App and setup the setting module
-ADD manage.py /app/
-ADD docker/ /app/docker
-ADD authproxy/ /app/authproxy
-ADD rdf4j/ /app/rdf4j
+RUN mkdir -p /var/www/static/ && pip install ".[prod]"
 
 # default settings are in MemberManagement
 ENV DJANGO_SETTINGS_MODULE "authproxy.docker_settings"
