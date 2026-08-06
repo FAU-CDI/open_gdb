@@ -8,6 +8,25 @@ services:
       - rdf4j-data:/var/rdf4j
       - rdf4j-logs:/usr/local/tomcat/logs
 
+  graphdb-workbench:
+    build:
+      context: .
+      dockerfile: graphdb-workbench/workbench.Dockerfile
+    environment:
+      GRAPHDB_URL: http://localhost
+      WORKBENCH_PORT: ${WORKBENCH_PORT}
+    depends_on:
+      - graphdb
+    ports:
+      - ${WORKBENCH_PORT}
+    networks:
+      - single-spa-network
+    healthcheck:
+      test: ["CMD-SHELL", "apk add --no-cache curl && curl -f -H 'Accept: */*' http://workbench:${WORKBENCH_PORT}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   nginx:
     image: nginxinc/nginx-unprivileged:latest
     restart: always
@@ -22,6 +41,7 @@ services:
       - ${PUBLIC_PORT}:80
     volumes:
         - ./nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template
+        - ./graphdb-workbench/dist:/usr/share/nginx/html
 
   outproxy:
     image: ghcr.io/fau-cdi/open_gdb_outproxy:latest
@@ -49,6 +69,8 @@ services:
       - rdf4j
     volumes:
       - authproxy-data:/data/
+    ports:
+      - 3000:8000
 
 volumes:
   rdf4j-data:

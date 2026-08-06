@@ -24,28 +24,28 @@ WORKDIR /app/
 RUN mkdir -p /var/www/static/ && pip install ".[prod]"
 
 # default settings are in MemberManagement
-ENV DJANGO_SETTINGS_MODULE "authproxy.docker_settings"
+ENV DJANGO_SETTINGS_MODULE="authproxy.docker_settings"
 
 ### ALL THE CONFIGURATION
 
 # The secret key used for django
-ENV DJANGO_SECRET_KEY ""
+ENV DJANGO_SECRET_KEY=""
 
 # A comma-seperated list of allowed hosts
-ENV DJANGO_ALLOWED_HOSTS "localhost,authproxy"
+ENV DJANGO_ALLOWED_HOSTS="localhost,authproxy"
 
 # Django superuser settings
-ENV DJANGO_SUPERUSER_NAME "admin"
-ENV DJANGO_SUPERUSER_PASSWORD ""
-ENV DJANGO_SUPERUSER_EMAIL ""
+ENV DJANGO_SUPERUSER_NAME="admin"
+ENV DJANGO_SUPERUSER_PASSWORD=""
+ENV DJANGO_SUPERUSER_EMAIL=""
 # Database settings
 ## Use SQLITE out of the box
-ENV DJANGO_DB_ENGINE "django.db.backends.sqlite3"
-ENV DJANGO_DB_NAME "/data/db.sqlite3"
-ENV DJANGO_DB_USER ""
-ENV DJANGO_DB_PASSWORD ""
-ENV DJANGO_DB_HOST ""
-ENV DJANGO_DB_PORT ""
+ENV DJANGO_DB_ENGINE="django.db.backends.sqlite3"
+ENV DJANGO_DB_NAME="/data/db.sqlite3"
+ENV DJANGO_DB_USER=""
+ENV DJANGO_DB_PASSWORD=""
+ENV DJANGO_DB_HOST=""
+ENV DJANGO_DB_PORT=""
 
 # create data volume, and collect static files
 RUN mkdir /data/ && chown -R www-data:www-data /data/

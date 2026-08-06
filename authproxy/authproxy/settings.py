@@ -137,13 +137,14 @@ RDF4J_REPOSITORY_PATH = "repositories/"
 # Request timeout for requests to the rdf4j backend in s.
 REQUEST_TIMEOUT = int(os.environ.get("RDF4J_TIMEOUT", 5))
 LOGIN_URL = "/admin"
+BASE_URL = os.environ.get("BASE_URL", "http://localhost")
 
 # Set max upload size to 100MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
+        "rdf4j.auth.GDBTokenAuthentication",
         "rest_framework.authentication.BasicAuthentication",
     ],
     "DEFAULT_CONTENT_NEGOTIATION_CLASS": "rdf4j.negotiation.IgnoreClientContentNegotiation",

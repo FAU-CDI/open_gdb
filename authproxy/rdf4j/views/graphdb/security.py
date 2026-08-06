@@ -21,12 +21,7 @@ def users(request):
 
     Route: /rest/security/users
     """
-    response_data = {}
-    # JsonResponse does not like lists, so we build the indices ourselves
-    for i, user in enumerate(User.objects.all()):
-        response_data[i] = user.normalize()
-
-    return JsonResponse(response_data)
+    return JsonResponse([user.normalize() for user in User.objects.all()], safe=False)
 
 
 class UsersView(APIView):
@@ -101,8 +96,8 @@ class UsersView(APIView):
             return HttpResponse(e, status=500)
 
         try:
-            user.set_app_settings(settings)
-        except User.AppSettingsError as e:
+            user.set_settings(settings)
+        except (User.SettingsError, User.AppSettingsError) as e:
             return JsonResponse(status=400, data={"message": str(e)})
 
         return HttpResponse()

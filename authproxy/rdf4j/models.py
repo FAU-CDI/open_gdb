@@ -12,7 +12,7 @@ from django.db.utils import IntegrityError
 from django.http import HttpResponseNotFound
 from django.shortcuts import get_object_or_404
 
-from authproxy.settings import RDF4J_REPOSITORY_PATH, RDF4J_URL, REQUEST_TIMEOUT
+from authproxy.settings import RDF4J_REPOSITORY_PATH, RDF4J_URL, REQUEST_TIMEOUT, BASE_URL
 
 
 def permission(func):
@@ -55,6 +55,7 @@ class User(AbstractUser):
 
     # AppSettings from GraphDB
     APP_SETTINGS = [
+        "COOKIE_CONSENT",
         "DEFAULT_INFERENCE",
         "DEFAULT_SAMEAS",
         "DEFAULT_VIS_GRAPH_SCHEMA",
@@ -183,31 +184,37 @@ class User(AbstractUser):
         data["username"] = self.username
         data["password"] = ""
 
-        # Include the role in the permissions
+        # Include the role in the permissions.
         granted_authorities = [self.role]
+        # Admins are also repo managers.
+        if self.role == self.Role.ADMIN:
+            granted_authorities.append(self.Role.REPO_MANAGER)
+
         # Only include per-repo permissions when the user has the USER role
         # GraphDB actually allows setting additional read/write permissions for singular
         # repos on admin and repo manager roles, which is strange
-        if self.role == self.Role.USER:
-            # Get the available permission prefixes from the RepoPermission class
-            permission_prefixes = tuple(
-                map(
-                    RepoPermission.build_codename_prefix,
-                    RepoPermission.permission_functions().keys(),
-                )
+        # if self.role == self.Role.USER:
+
+        # Get the available permission prefixes from the RepoPermission class
+        permission_prefixes = tuple(
+            map(
+                RepoPermission.build_codename_prefix,
+                RepoPermission.permission_functions().keys(),
             )
-            for (
-                permission_model
-            ) in self.user_permissions.all():  # pylint: disable=no-member
-                # Skip non-repo permissions
-                if permission_model.content_type.model_class() != Repository:
-                    continue
-                codename = permission_model.codename
-                # Check if the permission codename starts with one of the prefixes
-                if codename.startswith(permission_prefixes):
-                    granted_authorities.append(permission_model.codename)
+        )
+        for (
+            permission_model
+        ) in self.user_permissions.all():  # pylint: disable=no-member
+            # Skip non-repo permissions
+            if permission_model.content_type.model_class() != Repository:
+                continue
+            codename = permission_model.codename
+            # Check if the permission codename starts with one of the prefixes
+            if codename.startswith(permission_prefixes):
+                granted_authorities.append(permission_model.codename)
 
         data["grantedAuthorities"] = granted_authorities
+        data["authorities"] = granted_authorities
         data["appSettings"] = {
             "DEFAULT_INFERENCE": self.default_inference,
             "DEFAULT_SAMEAS": self.default_sameas,
@@ -348,10 +355,10 @@ class Repository(models.Model):
         """Error when there's no remote for a repo"""
 
         def __init__(
-                self,
-                repository_id: str,
-                status_code: int | None = None,
-                detail: str = "",
+            self,
+            repository_id: str,
+            status_code: int | None = None,
+            detail: str = "",
         ) -> None:
             parts = [f"RDF4J size request failed for repository {repository_id!r}"]
             if status_code is not None:
@@ -461,8 +468,22 @@ Available variables:
         )
 
     def to_dict(self) -> dict:
-        """Normalize this repository into dict."""
-        data = {}
+        """Normalize this repository into dict matching GraphDB's RepositoryResponse."""
+        repo_uri = f"{BASE_URL}/{RDF4J_REPOSITORY_PATH}{self.slug}"
+        # Set the defaults for the GraphDB workbench.
+        data = {
+            "uri": repo_uri,
+            "externalUrl": repo_uri,
+            "local": True,
+            "type": "graphdb",
+            "sesameType": "graphdb:SailRepository",
+            "location": "",
+            "readable": True,
+            "writable": True,
+            "unsupported": False,
+            "state": "RUNNING"
+        }
+
         for dict_key, object_key in Repository.ATTRIBUTE_MAP.items():
             data[dict_key] = getattr(self, object_key)
         return data
@@ -561,13 +582,4 @@ Available variables:
             size_after = self.size()
             return {"message": f"Affected triples: {size_after - size_before}"}
         if query_type == Query.Type.QUERY:
-
-            def preprocess_data(data):
-                headers = data["head"]["vars"]
-                for binding in data["results"]["bindings"]:
-                    binding["row"] = [
-                        binding.get(header, {}).get("value", "") for header in headers
-                    ]
-                return data
-
-            return preprocess_data(response.json())
+            return response.json()

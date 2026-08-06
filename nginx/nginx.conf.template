@@ -49,10 +49,34 @@ http {
         # See https://archive.is/gAdBR.
         set $authproxy ${AUTHPROXY_HOSTNAME}:8000;
 
-        # the homepage redirects to the auth proxy
+        # Serve workbench static files
+        root /usr/share/nginx/html;
+        index index.html;
+
         location / {
+            try_files $uri /index.html;
+        }
+
+        # Proxy bootstrap asset endpoints to the authproxy
+        location /assets/env.json {
             proxy_pass http://$authproxy;
-            proxy_redirect http://$authproxy/ $scheme://$host/;
+        }
+
+        location /assets/configuration.default.json {
+            proxy_pass http://$authproxy;
+        }
+
+        # Proxy API requests to the authproxy
+        location /rest {
+            proxy_pass http://$authproxy;
+        }
+
+        location /repositories {
+            proxy_pass http://$authproxy;
+        }
+
+        location /protocol {
+            proxy_pass http://$authproxy;
         }
     }
 }
