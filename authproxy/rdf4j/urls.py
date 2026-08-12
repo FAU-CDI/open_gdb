@@ -10,7 +10,7 @@ urlpatterns = [
     # -----------------
     # -- RDF4J Paths --
     # -----------------
-    path("", RedirectView.as_view(url=reverse_lazy("admin:index"))),
+    path("", RedirectView.as_view(url=reverse_lazy("account_login"))),
     # /repositories
     path("repositories", rdf4j.repositories.repositories, name="repositories"),
     path(

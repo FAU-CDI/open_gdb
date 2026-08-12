@@ -68,6 +68,53 @@ headers = { "Authorization": f"Token {token}"}
 api_response = requests.get("https://ts.my-domain.com/repositories", headers=headers)
 ```
 
+### Single Sign-On (SSO) with Keycloak
+
+The authproxy supports logging in via a Keycloak OpenID Connect provider alongside the
+regular username/password login. After an SSO login the user's access is synchronized
+from the claims in the ID token:
+
+- The user's GraphDB role is derived from Keycloak **group membership**: membership in
+  `KEYCLOAK_ADMIN_GROUP` (default unset; no group maps to `Admin` unless configured)
+  grants the `Admin` role,
+  `KEYCLOAK_REPO_MANAGER_GROUP` (default `gdb-repo-managers`) grants `Repository Manager`,
+  otherwise the user gets the `User` role.
+- Per-repository access is derived from the `gdb_repos` claim (configurable via
+  `KEYCLOAK_REPOS_CLAIM`), a whitespace separated list of repository ids. The user
+  gets read+write permission on each listed repository that exists in the authproxy.
+  Repos that don't exist yet are skipped.
+- Sync runs on every SSO login and is destructive: permissions not present in the claims
+  are removed, so the IdP is the single source of truth.
+
+#### Keycloak configuration
+
+1. Create an OIDC client in your realm with `Client authentication` enabled and set the
+   redirect URI to:
+   ```
+   https://<host>/accounts/oidc/keycloak/login/callback/
+   ```
+2. Add a **Group Membership** protocol mapper on the client so the ID token carries a
+   `groups` claim (used for the role mapping).
+3. Add a protocol mapper that puts the user's repository list into a `gdb_repos` claim
+   (e.g. a user-attribute mapper, or a group-attribute mapper if `gdb_repos` lives on a
+   group). Group attributes are not included in tokens by default. The claim name is
+   configurable via the `KEYCLOAK_REPOS_CLAIM` variable.
+4. Create the `gdb-admins` / `gdb-repo-managers` groups (or whatever you set the
+   `KEYCLOAK_ADMIN_GROUP` / `KEYCLOAK_REPO_MANAGER_GROUP` variables to).
+
+#### Environment variables
+
+| Variable | Description |
+|---|---|
+| `KEYCLOAK_SERVER_URL` | Keycloak issuer, e.g. `https://keycloak.example.org/realms/myrealm` |
+| `KEYCLOAK_CLIENT_ID` | OIDC client id |
+| `KEYCLOAK_CLIENT_SECRET` | OIDC client secret |
+| `KEYCLOAK_ADMIN_GROUP` | Group name that maps to the `Admin` role (default: empty) |
+| `KEYCLOAK_REPO_MANAGER_GROUP` | Group name that maps to the `Repository Manager` role (default `gdb-repo-managers`) |
+| `KEYCLOAK_REPOS_CLAIM` | Name of the claim carrying the repository list (default `gdb_repos`) |
+
+If `KEYCLOAK_SERVER_URL`, `KEYCLOAK_CLIENT_ID`, or `KEYCLOAK_CLIENT_SECRET` is unset, SSO is disabled.
+
 ### Changing service names
 In case you need to change the service/container names for the docker-compose project for whatever reason, you have to change the following:
 

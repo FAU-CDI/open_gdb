@@ -8,3 +8,4 @@ class Rdf4JConfig(AppConfig):
     def ready(self) -> None:
         # register the signal handlers
         import rdf4j.signals.handlers  # pylint: disable=unused-import, import-outside-toplevel
+        import rdf4j.signals.sso  # pylint: disable=unused-import, import-outside-toplevel

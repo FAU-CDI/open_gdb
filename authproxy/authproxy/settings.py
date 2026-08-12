@@ -33,16 +33,28 @@ AUTH_USER_MODEL = "rdf4j.User"
 # Application definition
 
 INSTALLED_APPS = [
-    "rdf4j.apps.Rdf4JConfig",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.sites",
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.openid_connect",
+    "rdf4j.apps.Rdf4JConfig",
     "rest_framework",
     "rest_framework.authtoken",
 ]
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
+
+SITE_ID = 1
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -51,6 +63,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -129,9 +142,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Custom configs
 RDF4J_HOSTNAME = os.environ.setdefault("RDF4J_HOSTNAME", "rdf4j")
-RDF4J_URL = (
-    f"http://{RDF4J_HOSTNAME}:8080/rdf4j-server/"  # use this for compose deployment
-)
+RDF4J_URL = f"http://{RDF4J_HOSTNAME}:8080/rdf4j-server/"  # use this for compose deployment
 # RDF4J_URL = "http://localhost:8080/rdf4j-server/" # use this for local deployment
 RDF4J_REPOSITORY_PATH = "repositories/"
 # Request timeout for requests to the rdf4j backend in s.
@@ -139,7 +150,40 @@ REQUEST_TIMEOUT = int(os.environ.get("RDF4J_TIMEOUT", 5))
 # Seconds a successful HTTP Basic login is remembered, so that clients sending credentials with every
 # request don't pay Django's slow password hash each time. 0 checks the password on every request.
 BASIC_AUTH_CACHE_SECONDS = int(os.environ.get("BASIC_AUTH_CACHE_SECONDS", 300))
-LOGIN_URL = "/admin"
+
+# SSO configuration (Keycloak via OpenID Connect)
+KEYCLOAK_SERVER_URL = os.environ.setdefault("KEYCLOAK_SERVER_URL", "")
+KEYCLOAK_CLIENT_ID = os.environ.setdefault("KEYCLOAK_CLIENT_ID", "")
+KEYCLOAK_CLIENT_SECRET = os.environ.setdefault("KEYCLOAK_CLIENT_SECRET", "")
+KEYCLOAK_ADMIN_GROUP = os.environ.setdefault("KEYCLOAK_ADMIN_GROUP", "")
+KEYCLOAK_REPO_MANAGER_GROUP = os.environ.setdefault(
+    "KEYCLOAK_REPO_MANAGER_GROUP", "gdb-repo-managers"
+)
+KEYCLOAK_REPOS_CLAIM = os.environ.setdefault("KEYCLOAK_REPOS_CLAIM", "gdb_repos")
+
+SOCIALACCOUNT_PROVIDERS = {}
+if KEYCLOAK_SERVER_URL and KEYCLOAK_CLIENT_ID and KEYCLOAK_CLIENT_SECRET:
+    SOCIALACCOUNT_PROVIDERS["openid_connect"] = {
+        "APPS": [
+            {
+                "provider_id": "keycloak",
+                "name": "Keycloak",
+                "client_id": KEYCLOAK_CLIENT_ID,
+                "secret": KEYCLOAK_CLIENT_SECRET,
+                "settings": {
+                    "server_url": KEYCLOAK_SERVER_URL,
+                },
+            },
+        ],
+    }
+
+ACCOUNT_LOGIN_METHODS = {"username"}
+ACCOUNT_SIGNUP_FIELDS = ["username*", "password1*", "password2*"]
+ACCOUNT_EMAIL_VERIFICATION = "none"
+
+LOGIN_URL = "account_login"
+LOGIN_REDIRECT_URL = "admin:index"
+ACCOUNT_LOGOUT_REDIRECT_URL = "account_login"
 
 # Set max upload size to 100MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600
