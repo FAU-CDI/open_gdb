@@ -136,6 +136,9 @@ RDF4J_URL = (
 RDF4J_REPOSITORY_PATH = "repositories/"
 # Request timeout for requests to the rdf4j backend in s.
 REQUEST_TIMEOUT = int(os.environ.get("RDF4J_TIMEOUT", 5))
+# Seconds a successful HTTP Basic login is remembered, so that clients sending credentials with every
+# request don't pay Django's slow password hash each time. 0 checks the password on every request.
+BASIC_AUTH_CACHE_SECONDS = int(os.environ.get("BASIC_AUTH_CACHE_SECONDS", 300))
 LOGIN_URL = "/admin"
 
 # Set max upload size to 100MB
@@ -144,7 +147,7 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
+        "rdf4j.authentication.CachedBasicAuthentication",
     ],
     "DEFAULT_CONTENT_NEGOTIATION_CLASS": "rdf4j.negotiation.IgnoreClientContentNegotiation",
 }
