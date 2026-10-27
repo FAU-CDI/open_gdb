@@ -139,6 +139,9 @@ REQUEST_TIMEOUT = int(os.environ.get("RDF4J_TIMEOUT", 5))
 # New repositories record their changes in the change log graph (opengdb:ChangeLogSail).
 # Needs the open_gdb rdf4j image, and WissKI 5 or later on the repository.
 RDF4J_CHANGELOG = os.environ.get("RDF4J_CHANGELOG", "0").lower() in ("1", "true", "yes", "on")
+# Seconds a successful HTTP Basic login is remembered, so that clients sending credentials with every
+# request don't pay Django's slow password hash each time. 0 checks the password on every request.
+BASIC_AUTH_CACHE_SECONDS = int(os.environ.get("BASIC_AUTH_CACHE_SECONDS", 300))
 LOGIN_URL = "/admin"
 
 # Set max upload size to 100MB
@@ -147,7 +150,7 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
+        "rdf4j.authentication.CachedBasicAuthentication",
     ],
     "DEFAULT_CONTENT_NEGOTIATION_CLASS": "rdf4j.negotiation.IgnoreClientContentNegotiation",
 }

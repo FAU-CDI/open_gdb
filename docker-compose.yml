@@ -50,6 +50,7 @@ services:
       RDF4J_HOSTNAME: rdf4j
       RDF4J_TIMEOUT: ${RDF4J_TIMEOUT:-5}
       RDF4J_CHANGELOG: ${RDF4J_CHANGELOG:-0}
+      BASIC_AUTH_CACHE_SECONDS: ${BASIC_AUTH_CACHE_SECONDS:-300}
     depends_on:
       - rdf4j
     volumes:
