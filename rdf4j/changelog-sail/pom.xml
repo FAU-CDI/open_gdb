@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>de.fau.cdi.opengdb</groupId>
+  <artifactId>opengdb-changelog-sail</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <name>OpenGDB change log Sail</name>
+  <description>Stacked RDF4J Sail that records every committed change in a reserved graph of the repository.</description>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- RDF4J 6 ships Java 25 class files. -->
+    <maven.compiler.release>25</maven.compiler.release>
+    <rdf4j.version>6.1.0</rdf4j.version>
+    <!-- Same version as in rdf4j-server.war. -->
+    <slf4j.version>2.0.17</slf4j.version>
+    <junit.version>5.13.4</junit.version>
+    <!-- Tests tagged "perf" run only with -Pperf. -->
+    <excludedTestGroups>perf</excludedTestGroups>
+    <testArgLine></testArgLine>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.eclipse.rdf4j</groupId>
+        <artifactId>rdf4j-bom</artifactId>
+        <version>${rdf4j.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- Provided by rdf4j-server.war. -->
+    <dependency>
+      <groupId>org.eclipse.rdf4j</groupId>
+      <artifactId>rdf4j-sail-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.rdf4j</groupId>
+      <artifactId>rdf4j-model</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.rdf4j</groupId>
+      <artifactId>rdf4j-model-vocabulary</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>${slf4j.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.eclipse.rdf4j</groupId>
+      <artifactId>rdf4j-sail-nativerdf</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.rdf4j</groupId>
+      <artifactId>rdf4j-sail-lmdb</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.rdf4j</groupId>
+      <artifactId>rdf4j-repository-sail</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.rdf4j</groupId>
+      <artifactId>rdf4j-repository-manager</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.rdf4j</groupId>
+      <artifactId>rdf4j-queryparser-sparql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.rdf4j</groupId>
+      <artifactId>rdf4j-rio-turtle</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>${slf4j.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>opengdb-changelog-sail</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.14.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.3</version>
+        <configuration>
+          <excludedGroups>${excludedTestGroups}</excludedGroups>
+          <argLine>${testArgLine}</argLine>
+          <systemPropertyVariables>
+            <org.slf4j.simpleLogger.defaultLogLevel>warn</org.slf4j.simpleLogger.defaultLogLevel>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.2</version>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <profile>
+      <!-- mvn -Pperf test -Dtest=PerformanceTest -->
+      <id>perf</id>
+      <properties>
+        <excludedTestGroups>none</excludedTestGroups>
+        <testArgLine>-Xmx3g</testArgLine>
+      </properties>
+    </profile>
+  </profiles>
+</project>

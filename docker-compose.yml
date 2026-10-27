@@ -1,6 +1,10 @@
 services:
   rdf4j:
-    image: eclipse/rdf4j-workbench
+    image: ghcr.io/fau-cdi/open_gdb_rdf4j:latest
+    build:
+      context: rdf4j
+      args:
+        RDF4J_VERSION: ${RDF4J_VERSION:-6.1.0}
     restart: always
     environment:
       - JAVA_OPTS=-Xms1g -Xmx4g -Dhttp.nonProxyHosts="" -Dhttp.proxyHost=outproxy -Dhttp.proxyPort=8080 -Dhttps.proxyHost=outproxy -Dhttps.proxyPort=8080
@@ -45,6 +49,7 @@ services:
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS}
       RDF4J_HOSTNAME: rdf4j
       RDF4J_TIMEOUT: ${RDF4J_TIMEOUT:-5}
+      RDF4J_CHANGELOG: ${RDF4J_CHANGELOG:-0}
     depends_on:
       - rdf4j
     volumes:

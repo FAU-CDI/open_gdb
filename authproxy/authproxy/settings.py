@@ -136,6 +136,9 @@ RDF4J_URL = (
 RDF4J_REPOSITORY_PATH = "repositories/"
 # Request timeout for requests to the rdf4j backend in s.
 REQUEST_TIMEOUT = int(os.environ.get("RDF4J_TIMEOUT", 5))
+# New repositories record their changes in the change log graph (opengdb:ChangeLogSail).
+# Needs the open_gdb rdf4j image, and WissKI 5 or later on the repository.
+RDF4J_CHANGELOG = os.environ.get("RDF4J_CHANGELOG", "0").lower() in ("1", "true", "yes", "on")
 LOGIN_URL = "/admin"
 
 # Set max upload size to 100MB

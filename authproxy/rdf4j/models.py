@@ -12,7 +12,12 @@ from django.db.utils import IntegrityError
 from django.http import HttpResponseNotFound
 from django.shortcuts import get_object_or_404
 
-from authproxy.settings import RDF4J_REPOSITORY_PATH, RDF4J_URL, REQUEST_TIMEOUT
+from authproxy.settings import (
+    RDF4J_CHANGELOG,
+    RDF4J_REPOSITORY_PATH,
+    RDF4J_URL,
+    REQUEST_TIMEOUT,
+)
 
 
 def permission(func):
@@ -341,6 +346,43 @@ class Query(models.Model):
         UPDATE = "update"
 
 
+NATIVE_STORE_TEMPLATE = """@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix config: <tag:rdf4j.org,2023:config/>.
+[] a config:Repository ;
+config:rep.id "${slug}" ;
+rdfs:label "${description}" ;
+config:rep.impl [
+    config:rep.type "openrdf:SailRepository" ;
+    config:sail.impl [
+        config:sail.type "openrdf:NativeStore" ;
+        config:native.tripleIndexes "spoc,posc,cosp"
+    ]
+]."""
+
+# The same store inside the change log Sail of the open_gdb rdf4j image. Repositories with the
+# change log need WissKI 5 or later.
+CHANGELOG_TEMPLATE = """@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix config: <tag:rdf4j.org,2023:config/>.
+[] a config:Repository ;
+config:rep.id "${slug}" ;
+rdfs:label "${description}" ;
+config:rep.impl [
+    config:rep.type "openrdf:SailRepository" ;
+    config:sail.impl [
+        config:sail.type "opengdb:ChangeLogSail" ;
+        config:delegate [
+            config:sail.type "openrdf:NativeStore" ;
+            config:native.tripleIndexes "spoc,posc,cosp"
+        ]
+    ]
+]."""
+
+
+def default_turtle_template() -> str:
+    """Template for new repositories: with the change log if RDF4J_CHANGELOG is set."""
+    return CHANGELOG_TEMPLATE if RDF4J_CHANGELOG else NATIVE_STORE_TEMPLATE
+
+
 class Repository(models.Model):
     """Model representing a repository."""
 
@@ -362,18 +404,8 @@ class Repository(models.Model):
             self.repository_id = repository_id
             self.status_code = status_code
 
-    DEFAULT_TEMPLATE = """@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
-@prefix config: <tag:rdf4j.org,2023:config/>.
-[] a config:Repository ;
-config:rep.id "${slug}" ;
-rdfs:label "${description}" ;
-config:rep.impl [
-    config:rep.type "openrdf:SailRepository" ;
-    config:sail.impl [
-        config:sail.type "openrdf:NativeStore" ;
-        config:native.tripleIndexes "spoc,posc,cosp"
-    ]
-]."""
+    DEFAULT_TEMPLATE = NATIVE_STORE_TEMPLATE
+    CHANGELOG_TEMPLATE = CHANGELOG_TEMPLATE
     # config:sail.iterationCacheSyncThreshold "10000";
     # config:sail.defaultQueryEvaluationMode "STANDARD";
 
@@ -405,7 +437,7 @@ Available variables:
     public_read = models.BooleanField(default=False)
     public_write = models.BooleanField(default=False)
     turtle_template = models.TextField(
-        null=True, default=DEFAULT_TEMPLATE, help_text=TURTLE_TEMPLATE_HELP_TEXT
+        null=True, default=default_turtle_template, help_text=TURTLE_TEMPLATE_HELP_TEXT
     )
 
     def __str__(self) -> str:
@@ -512,11 +544,24 @@ Available variables:
             url=url, data=self.to_turtle(), headers=headers, timeout=REQUEST_TIMEOUT
         )
 
-        # TODO: Better error handling here... See if there are different codes
-        # and messages that are returned by rdf4j and handle them accordingly
-        if response.status_code != 204:
-            raise IntegrityError(f"The {self.slug} repository already has a remote!")
-        self.has_remote = True
+        # RDF4J 6 answers 201 or 204 for a new repository and 409 for an existing one. Keep the
+        # Django row for an existing repository: the post_save handler deletes the row on errors,
+        # and the pre_delete handler then deletes the repository in RDF4J with all its data.
+        # Other errors, such as a Sail type the RDF4J image doesn't have, must not count as
+        # "exists".
+        if response.status_code in (200, 201, 204):
+            self.has_remote = True
+            return
+        body = response.text or ""
+        if response.status_code == 409 or (
+            response.status_code in (400, 412) and "already exists" in body.lower()
+        ):
+            self.has_remote = True
+            return
+        raise IntegrityError(
+            f"RDF4J did not create repository {self.slug!r} "
+            f"(HTTP {response.status_code}): {body[:300]}"
+        )
 
     def delete_remote(self) -> None:
         """Delete the corresponding repository from from the RDF4J server"""
