@@ -75,5 +75,5 @@ class RepositoryTemplateTests(TestCase):
     def test_new_repositories_use_the_lmdb_store(self):
         turtle = Repository(slug="demo", description="Demo").to_turtle()
         self.assertIn('config:sail.type "rdf4j:LmdbStore"', turtle)
-        self.assertIn('config:lmdb.tripleIndexes "spoc,posc,cosp"', turtle)
+        self.assertIn('config:lmdb.tripleIndexes "spoc,posc,ospc"', turtle)
         self.assertNotIn("NativeStore", turtle)

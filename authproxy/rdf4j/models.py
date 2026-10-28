@@ -362,6 +362,9 @@ class Repository(models.Model):
             self.repository_id = repository_id
             self.status_code = status_code
 
+    # WissKI reads with GRAPH ?g, so the context is never bound first. spoc serves entity loads
+    # (<s> <p> ?o), posc class listings (?x a <C>) and inverse steps, ospc deletes and merges
+    # (?s ?p <uri>).
     DEFAULT_TEMPLATE = """@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 @prefix config: <tag:rdf4j.org,2023:config/>.
 [] a config:Repository ;
@@ -371,7 +374,7 @@ config:rep.impl [
     config:rep.type "openrdf:SailRepository" ;
     config:sail.impl [
         config:sail.type "rdf4j:LmdbStore" ;
-        config:lmdb.tripleIndexes "spoc,posc,cosp"
+        config:lmdb.tripleIndexes "spoc,posc,ospc"
     ]
 ]."""
     # config:sail.iterationCacheSyncThreshold "10000";
