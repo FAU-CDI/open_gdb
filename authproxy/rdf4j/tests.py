@@ -75,5 +75,10 @@ class RepositoryTemplateTests(TestCase):
     def test_new_repositories_use_the_lmdb_store(self):
         turtle = Repository(slug="demo", description="Demo").to_turtle()
         self.assertIn('config:sail.type "rdf4j:LmdbStore"', turtle)
-        self.assertIn('config:lmdb.tripleIndexes "spoc,posc,ospc"', turtle)
         self.assertNotIn("NativeStore", turtle)
+
+    def test_triple_indexes_use_the_namespace_rdf4j_reads(self):
+        turtle = Repository(slug="demo", description="Demo").to_turtle()
+        self.assertIn("@prefix lmdb: <http://rdf4j.org/config/sail/lmdb#>.", turtle)
+        self.assertIn('lmdb:tripleIndexes "spoc,posc,ospc"', turtle)
+        self.assertNotIn("config:lmdb.", turtle)

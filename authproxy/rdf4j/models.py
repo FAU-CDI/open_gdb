@@ -365,8 +365,12 @@ class Repository(models.Model):
     # WissKI reads with GRAPH ?g, so the context is never bound first. spoc serves entity loads
     # (<s> <p> ?o), posc class listings (?x a <C>) and inverse steps, ospc deletes and merges
     # (?s ?p <uri>).
+    # The LMDB settings only exist in the lmdb# namespace; RDF4J silently ignores
+    # config:lmdb.tripleIndexes. Without triple indexes, RDF4J 6.0 and 6.1 can't reopen the
+    # store after a restart ("triple-indexes missing in store.properties file").
     DEFAULT_TEMPLATE = """@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 @prefix config: <tag:rdf4j.org,2023:config/>.
+@prefix lmdb: <http://rdf4j.org/config/sail/lmdb#>.
 [] a config:Repository ;
 config:rep.id "${slug}" ;
 rdfs:label "${description}" ;
@@ -374,7 +378,7 @@ config:rep.impl [
     config:rep.type "openrdf:SailRepository" ;
     config:sail.impl [
         config:sail.type "rdf4j:LmdbStore" ;
-        config:lmdb.tripleIndexes "spoc,posc,ospc"
+        lmdb:tripleIndexes "spoc,posc,ospc"
     ]
 ]."""
     # config:sail.iterationCacheSyncThreshold "10000";
