@@ -9,7 +9,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from rest_framework.exceptions import AuthenticationFailed
 
 from .authentication import CachedBasicAuthentication
-from .models import User
+from .models import Repository, User
 
 
 def basic(username, password):
@@ -69,3 +69,11 @@ class CachedBasicAuthenticationTests(TestCase):
         self.auth.authenticate(basic("wisski", "secret"))
         _, checks = self.count_hash_checks(basic("wisski", "secret"))
         self.assertEqual(checks, 1)
+
+
+class RepositoryTemplateTests(TestCase):
+    def test_new_repositories_use_the_lmdb_store(self):
+        turtle = Repository(slug="demo", description="Demo").to_turtle()
+        self.assertIn('config:sail.type "rdf4j:LmdbStore"', turtle)
+        self.assertIn('config:lmdb.tripleIndexes "spoc,posc,cosp"', turtle)
+        self.assertNotIn("NativeStore", turtle)
