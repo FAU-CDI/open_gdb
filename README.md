@@ -113,6 +113,39 @@ Optional parameters on the `opengdb:ChangeLogSail` node, with `@prefix cl: <tag:
 | `cl:maxNodes` | 200 | More distinct IRIs in one transaction make a `cl:Summary` record. |
 | `cl:maxTerms` | 100 | More predicates, classes or graphs make a `cl:Everything` record. |
 
+#### How many slots
+
+A consumer that falls more than `cl:slots` records behind loses entity-level detail: it catches up through the summary index and refreshes whole bundles. What counts is how much is written between two reads of the consumer, not the total. WissKI reads the log after every web request (at most every 2 seconds), on cron and with `drush wisski-salz:sync-triplestore-changes`. Editors working in the browser therefore never fill the default ring. Imports through Drush or scripts do: nothing reads the log until the next request or cron run.
+
+Measured with WissKI 5 and its default data model: saving a new entity with one field writes about 4 records, and a record takes about 11 statements of the log graph. 20,000 slots are about 220,000 statements, a few MB.
+
+Rule of thumb: `cl:slots` ≥ saves per minute × 4 × minutes without a read × 2.
+
+| Workload | Calculation | `cl:slots` |
+|---|---|---|
+| Editing in the browser, even 100 saves per minute | read every few seconds | 2000 (default) |
+| Script import, 100 entities per minute, no request for an hour | 100 × 4 × 60 × 2 | about 50,000 |
+| Import at full speed (about 900 entities per minute), 10 minutes | 900 × 4 × 10 × 2 | about 70,000 |
+| One-off import of 100,000 entities | 400,000 records | don't size for it; call `drush wisski-salz:sync-triplestore-changes` during the import, or accept one bundle-level refresh |
+
+#### Changing a parameter of an existing repository
+
+`enable_changelog` uses the defaults. To change `cl:slots` (or another parameter) later, insert it into the configuration RDF4J has stored, post it back, and restart rdf4j. Fetching the stored configuration keeps the repository's label and triple indexes; changed indexes would make NativeStore rebuild them on start.
+
+```bash
+docker compose exec authproxy sh -c '
+  R=http://rdf4j:8080/rdf4j-server/repositories/default
+  wget -qO- --header="Accept: text/turtle" $R/config \
+    | sed "s/config:sail.type \"opengdb:ChangeLogSail\";/&\n  cl:slots 20000;/" > /tmp/config.ttl
+  grep -n "cl:slots" /tmp/config.ttl
+  wget -qO- --header="Content-Type: text/turtle" --post-file=/tmp/config.ttl $R/config'
+docker compose restart rdf4j
+# Check: the config shows cl:slots, /size is unchanged
+docker compose exec authproxy wget -qO- --header="Accept: text/turtle" http://rdf4j:8080/rdf4j-server/repositories/default/config
+```
+
+Replace `default` with the repository ID. If the configuration already has `cl:slots`, change the number in place instead of inserting a second one. A changed slot count starts a new epoch, so consumers refresh everything once; the revisions continue. For new repositories, add the parameter to `Repository.CHANGELOG_TEMPLATE`, or to the *Turtle template* field when creating the repository in the admin.
+
 ### Switching existing repositories
 
 ```bash
@@ -168,7 +201,7 @@ The queries WissKI runs are in `rdf4j/changelog-sail/src/test/java/de/fau/cdi/op
 - **Dumps don't contain the log.** A repository loaded from a dump starts a new epoch, so its consumers refresh everything once.
 - **Over-approximation.** The log records write calls, not their net effect; a no-op write still makes a record.
 - **Size.** At most R × (`maxNodes` + 3 × `maxTerms`) statements, 1 million with the defaults, plus one entry per distinct predicate, class and graph. A WissKI edit touches few IRIs.
-- **Slot count.** A consumer more than R records behind catches up through the summary index, at bundle level instead of entity level. A WissKI save writes about two transactions per changed field value; raise R for busy repositories.
+- **Slot count.** A consumer more than R records behind catches up through the summary index, at bundle level instead of entity level. Saving a new WissKI entity writes about 4 records; see [How many slots](#how-many-slots) to size R for imports.
 - **Inferencers** below the Sail aren't seen. Inferred changes follow from the recorded explicit ones.
 - **Old snapshots.** A `SNAPSHOT` or `SERIALIZABLE` transaction that doesn't see the newest record gets its record written right after its commit, in a transaction of its own.
 - **Storage.** WissKI's own edits keep growing `values.dat` on NativeStore. The remedy is a dump and reload, or the LMDB store.
