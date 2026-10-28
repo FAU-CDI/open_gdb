@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
+import org.eclipse.rdf4j.common.iteration.FilterIteration;
+import org.eclipse.rdf4j.common.order.StatementOrder;
 import org.eclipse.rdf4j.common.transaction.IsolationLevel;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
@@ -63,6 +65,54 @@ public class ChangeLogSailConnection extends SailConnectionWrapper {
 	public void begin(IsolationLevel level) throws SailException {
 		resetTransaction();
 		super.begin(level);
+	}
+
+	// --- Reads: the log graph only if named ----------------------------------------------------
+
+	@Override
+	public CloseableIteration<? extends Resource> getContextIDs() throws SailException {
+		return new FilterIteration<Resource>(super.getContextIDs()) {
+			@Override
+			protected boolean accept(Resource context) {
+				return !isLogGraph(context);
+			}
+
+			@Override
+			protected void handleClose() {
+			}
+		};
+	}
+
+	@Override
+	public CloseableIteration<? extends Statement> getStatements(Resource subj, IRI pred, Value obj,
+			boolean includeInferred, Resource... contexts) throws SailException {
+		CloseableIteration<? extends Statement> statements = super.getStatements(subj, pred, obj, includeInferred,
+				contexts);
+		return contexts.length == 0 ? LogHidingTripleSource.withoutLog(statements) : statements;
+	}
+
+	@Override
+	public CloseableIteration<? extends Statement> getStatements(StatementOrder statementOrder, Resource subj,
+			IRI pred, Value obj, boolean includeInferred, Resource... contexts) throws SailException {
+		CloseableIteration<? extends Statement> statements = super.getStatements(statementOrder, subj, pred, obj,
+				includeInferred, contexts);
+		return contexts.length == 0 ? LogHidingTripleSource.withoutLog(statements) : statements;
+	}
+
+	@Override
+	public boolean hasStatement(Resource subj, IRI pred, Value obj, boolean includeInferred, Resource... contexts)
+			throws SailException {
+		if (contexts.length != 0) {
+			return super.hasStatement(subj, pred, obj, includeInferred, contexts);
+		}
+		try (CloseableIteration<? extends Statement> statements = getStatements(subj, pred, obj, includeInferred)) {
+			return statements.hasNext();
+		}
+	}
+
+	@Override
+	public long size(Resource... contexts) throws SailException {
+		return contexts.length == 0 ? super.size() - super.size(LOG_GRAPH) : super.size(contexts);
 	}
 
 	// --- Write calls ---------------------------------------------------------------------------

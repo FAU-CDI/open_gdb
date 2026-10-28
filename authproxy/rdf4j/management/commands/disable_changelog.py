@@ -10,7 +10,7 @@ class Command(BaseCommand):
     help = (
         "Unwrap the store of repositories with the change log Sail. Restart rdf4j afterwards, then "
         "run this command again with --purge-log: without the Sail, the log graph would be visible "
-        "to WissKI 4 and stale for WissKI 5."
+        "to every query and stale for WissKI 5."
     )
 
     def add_arguments(self, parser):

@@ -233,9 +233,9 @@ final class Fixture implements AutoCloseable {
 		});
 	}
 
-	/** Statements outside the log graph. */
+	/** Statements outside the log graph; size() over all graphs leaves the log out. */
 	long dataSize() {
-		return read(con -> con.size() - con.size(LOG_GRAPH));
+		return read(RepositoryConnection::size);
 	}
 
 	private static long longValue(BindingSet row, String name) {

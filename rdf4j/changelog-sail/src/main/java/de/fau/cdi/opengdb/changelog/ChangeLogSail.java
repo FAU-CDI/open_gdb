@@ -1,11 +1,15 @@
 package de.fau.cdi.opengdb.changelog;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 
+import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategyFactory;
 import org.eclipse.rdf4j.sail.Sail;
 import org.eclipse.rdf4j.sail.SailConnection;
 import org.eclipse.rdf4j.sail.SailException;
+import org.eclipse.rdf4j.sail.StackableSail;
 import org.eclipse.rdf4j.sail.helpers.SailWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +21,11 @@ import org.slf4j.LoggerFactory;
  * The connection wrapper records the arguments of the write calls. It doesn't use a
  * {@code SailConnectionListener}, so the store below keeps its fast paths. An inferencer below this
  * Sail isn't seen; inferred changes follow from the explicit ones that are recorded.
+ * <p>
+ * Reads that don't name a graph don't see the log: SPARQL patterns without a graph or with
+ * {@code GRAPH ?g}, and {@code getStatements}, {@code getContextIDs} and {@code size} over all graphs.
+ * Generic updates such as {@code DELETE { GRAPH ?g { ?s ?p <x> } } WHERE { GRAPH ?g { ?s ?p <x> } }}
+ * therefore leave the log alone instead of failing on it.
  */
 public class ChangeLogSail extends SailWrapper {
 
@@ -87,6 +96,7 @@ public class ChangeLogSail extends SailWrapper {
 
 	@Override
 	public void init() throws SailException {
+		hideLogFromQueries();
 		super.init();
 		initLog();
 	}
@@ -95,6 +105,37 @@ public class ChangeLogSail extends SailWrapper {
 	public SailConnection getConnection() throws SailException {
 		verifyBaseSailSet();
 		return new ChangeLogSailConnection(this, getBaseSail().getConnection());
+	}
+
+	/**
+	 * Wraps the evaluation strategy factory of the store below, so that query evaluation reads through
+	 * {@link LogHidingTripleSource}. NativeStore, LmdbStore and MemoryStore have the accessors, but no
+	 * common interface; Sails in between are passed through.
+	 */
+	private void hideLogFromQueries() {
+		Sail store = getBaseSail();
+		while (store != null) {
+			Method get;
+			Method set;
+			try {
+				get = store.getClass().getMethod("getEvaluationStrategyFactory");
+				set = store.getClass().getMethod("setEvaluationStrategyFactory", EvaluationStrategyFactory.class);
+			} catch (NoSuchMethodException e) {
+				store = store instanceof StackableSail stackable ? stackable.getBaseSail() : null;
+				continue;
+			}
+			try {
+				EvaluationStrategyFactory factory = (EvaluationStrategyFactory) get.invoke(store);
+				if (!(factory instanceof LogHidingEvaluationStrategyFactory)) {
+					set.invoke(store, new LogHidingEvaluationStrategyFactory(factory));
+				}
+				return;
+			} catch (IllegalAccessException | InvocationTargetException e) {
+				throw new SailException("Change log: could not hide the log graph from queries", e);
+			}
+		}
+		throw new SailException("Change log: the store below " + getBaseSail().getClass().getName()
+				+ " has no evaluation strategy factory to hide the log graph from queries");
 	}
 
 	/**

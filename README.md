@@ -88,17 +88,8 @@ The `rdf4j` image contains a Sail that records every committed change of a repos
 
 ### Requirements
 
-- **WissKI 5 or later** on every repository with the change log. WissKI 4 does not know the log graph, and these features fail on such a repository:
-
-  | WissKI 4 code | Query | Effect |
-  |---|---|---|
-  | `Sparql11EngineWithPB::deleteEntity()` | `DELETE { GRAPH ?g { ?s ?p <uri> } } WHERE { GRAPH ?g { ?s ?p <uri> } }` | The update also matches log entries and is rejected: recently edited entities can't be deleted. |
-  | `wisski_merge` `Merger::engineReplaceUris()` | `INSERT { GRAPH ?g { ?s ?p <to> } } WHERE { … GRAPH ?g { ?s ?p ?o } }` | Rejected, so merging fails. |
-  | `ReferencedEntityDeleter::referringEntityIds()` | `GRAPH ?g { ?s ?p ?o }` | Finds log entries as referrers and refuses to delete. |
-  | `drush wisski-salz:export-nquads` / `import-nquads` | `GRAPH ?g { ?s ?p ?o }`, then N-Quads upload | The export contains the log; importing it is rejected. |
-  | Triple counts, statistics, `ASK {{ <uri> ?p ?o } UNION { ?s ?p <uri> }}` | | Include the log; deleted entities still seem to exist. |
-
-- The change log is therefore **off by default**. `RDF4J_CHANGELOG=1` (authproxy) creates new repositories with it; existing repositories are switched with `enable_changelog`.
+- Reads that don't name the log graph don't see it: SPARQL patterns without a graph or with `GRAPH ?g`, the WHERE part of updates, `/statements`, `/contexts` and `/size` over all graphs. Generic updates such as WissKI's `deleteEntity()` (`DELETE { GRAPH ?g { ?s ?p <uri> } } WHERE { GRAPH ?g { ?s ?p <uri> } }`) and merge therefore leave the log alone instead of failing on it, and exports don't contain it. Consumers read it by naming the graph.
+- The change log is **off by default**. `RDF4J_CHANGELOG=1` (authproxy) creates new repositories with it; existing repositories are switched with `enable_changelog`. Only [WissKI](https://wiss-ki.eu/) 5 reads it.
 
 ### Configuration
 
@@ -131,9 +122,9 @@ docker compose exec authproxy python manage.py enable_changelog --all   # or nam
 docker compose restart rdf4j
 ```
 
-`enable_changelog` keeps each repository's triple indexes (older defaults differ, and changed indexes would make NativeStore rebuild them on start), checks the configuration RDF4J has stored, removes a stale log graph, and posts the new configuration to `/repositories/{id}/config`. That only rewrites `config.ttl`; RDF4J uses it after the restart, which affects all repositories of the server. Afterwards `GET /rdf4j-server/repositories/{id}/config` shows `opengdb:ChangeLogSail`, and the data size (`/size` minus `/size?context=<tag:fau-cdi.github.io,2026:opengdb/changelog>`) is unchanged.
+`enable_changelog` keeps each repository's triple indexes (older defaults differ, and changed indexes would make NativeStore rebuild them on start), checks the configuration RDF4J has stored, removes a stale log graph, and posts the new configuration to `/repositories/{id}/config`. That only rewrites `config.ttl`; RDF4J uses it after the restart, which affects all repositories of the server. Afterwards `GET /rdf4j-server/repositories/{id}/config` shows `opengdb:ChangeLogSail`, and `/size` is unchanged (it leaves the log out; `/size?context=<tag:fau-cdi.github.io,2026:opengdb/changelog>` counts the log).
 
-Back to the plain store, for example before returning to WissKI 4:
+Back to the plain store:
 
 ```bash
 docker compose exec authproxy python manage.py disable_changelog --all
@@ -167,13 +158,14 @@ WissKI keeps the namespace in one constant. Tell the WissKI side if anything her
 
 - Summary index for consumers that fell behind the ring: `cl:p-{h} cl:predicate <P>`, `cl:c-{h} cl:class <C>`, `cl:g-{h} cl:graph <G>`, each with `cl:lastSlot` and `cl:lastCycle` of the newest record that touched it. `{h}` is the first 16 hex digits of the SHA-256 of the IRI.
 - Only IRIs are recorded, never literal values. Records reuse existing IRIs, so the log doesn't grow NativeStore's `values.dat` (it never frees values).
+- Hiding: reads that don't name the log graph don't see it (see Requirements). Only a pattern or call that names `<tag:fau-cdi.github.io,2026:opengdb/changelog>` reads it.
 - Protection: adding to the log graph, removing with the log graph as context, and pattern removes with a `cl:` predicate fail with a `SailException`. Clearing the log graph (also by `CLEAR/DROP NAMED`) is skipped silently. Removes over all graphs skip log entries.
 
 The queries WissKI runs are in `rdf4j/changelog-sail/src/test/java/de/fau/cdi/opengdb/changelog/Fixture.java` (`STATE_QUERY`, `RECORDS_QUERY`, `CATCH_UP_QUERY`).
 
 ### Caveats
 
-- **The log graph is visible** in `contexts` listings, dumps and queries over all graphs. Log triples point to data IRIs, so queries for incoming links without `GRAPH` see them. WissKI 5 excludes the graph; other tools should too.
+- **Dumps don't contain the log.** A repository loaded from a dump starts a new epoch, so its consumers refresh everything once.
 - **Over-approximation.** The log records write calls, not their net effect; a no-op write still makes a record.
 - **Size.** At most R × (`maxNodes` + 3 × `maxTerms`) statements, 1 million with the defaults, plus one entry per distinct predicate, class and graph. A WissKI edit touches few IRIs.
 - **Slot count.** A consumer more than R records behind catches up through the summary index, at bundle level instead of entity level. A WissKI save writes about two transactions per changed field value; raise R for busy repositories.

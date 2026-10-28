@@ -13,6 +13,7 @@ WissKI shows data from the triplestore and must cache what it reads: entities, p
 | Change log Sail | `rdf4j/changelog-sail/` | A stacked Sail (`opengdb:ChangeLogSail`) over any store. It records the arguments of the write calls and writes one record per transaction into the log graph, in the same transaction. |
 | Image | `rdf4j/Dockerfile` | The `eclipse/rdf4j-workbench` image with the Sail's jar added to `rdf4j-server.war`. Without a repository that uses the Sail, it behaves like the stock image. |
 | CI | `.github/workflows/rdf4j.yml` | `mvn verify`, then build and push `ghcr.io/fau-cdi/open_gdb_rdf4j`. |
+| Hiding | `LogHidingEvaluationStrategyFactory`, `LogHidingTripleSource` | Reads that don't name the log graph don't see it. |
 | Opt-in | `RDF4J_CHANGELOG` (authproxy) | `1` creates new repositories with the Sail. Default `0`. |
 | Commands | `enable_changelog`, `disable_changelog` | Switch existing repositories to the Sail and back. |
 | `create_remote()` | `authproxy/rdf4j/models.py` | Accepts RDF4J 6's 201, keeps the Django row on 409, and reports every other error. |
@@ -57,9 +58,13 @@ A `SNAPSHOT` or `SERIALIZABLE` transaction reads from its start. If it doesn't s
 
 Clients can't add to the log graph or remove from it by naming it; pattern removes with a `cl:` predicate are rejected. Clearing the log graph is skipped silently, because `CLEAR/DROP NAMED` clear every graph one by one and must not fail. `DROP ALL`/`CLEAR ALL` keep the log and write a `cl:Everything` record. (`DROP ALL` calls `clear()` without contexts; only `NAMED` goes graph by graph.)
 
-### Opt-in, because WissKI 4 is not compatible
+### Hidden from reads that don't name it
 
-Log triples point to data IRIs (`cl:slot-k cl:node <entity>`). WissKI 4 runs generic `GRAPH ?g` updates, for example in `deleteEntity()` (`DELETE { GRAPH ?g { ?s ?p <uri> } } WHERE { GRAPH ?g { ?s ?p <uri> } }`), and they match log entries. On a repository with the log, WissKI 4 fails to delete recently edited entities and to merge, its reference dialog refuses deletions, and its N-Quads export can't be imported again. WissKI 5 excludes the log graph. The log is therefore off by default: `RDF4J_CHANGELOG=1` for new repositories, `enable_changelog` for existing ones, only after the update to WissKI 5.
+Log triples point to data IRIs (`cl:slot-k cl:node <entity>`). Visible log entries would break generic queries: WissKI's `deleteEntity()` (`DELETE { GRAPH ?g { ?s ?p <uri> } } WHERE { GRAPH ?g { ?s ?p <uri> } }`) would bind `?g` to the log graph and be rejected, merging likewise, the reference dialog would find log entries as referrers, counts would include the log, and N-Quads exports couldn't be imported again. Filtering in every client is error-prone, so the Sail hides the log itself.
+
+The Sail wraps the evaluation strategy factory of the store below and gives query evaluation a triple source that drops log statements from every lookup without a graph. RDF4J evaluates the default graph and `GRAPH ?g` with such lookups, so both leave the log out; a pattern that names the log graph asks for it and reads it. The store keeps its own strategy, optimizers and statistics. `getStatements`, `getContextIDs`, `hasStatement` and `size` over all graphs filter the same way, so `/statements`, `/contexts`, `/size` and exports leave the log out. NativeStore, LmdbStore and MemoryStore have the factory accessors; the Sail refuses to start over a store without them.
+
+The log is still opt-in: `RDF4J_CHANGELOG=1` for new repositories, `enable_changelog` for existing ones.
 
 `enable_changelog` keeps each repository's triple indexes (authproxy's older defaults differ, and changed indexes would make NativeStore rebuild them on start), checks the configuration RDF4J has stored, and removes a stale log graph, so the Sail starts a new epoch. `disable_changelog` goes back; `--purge-log` removes the graph after the restart.
 
@@ -103,6 +108,6 @@ docker run --rm -v "$PWD":/src -v perf:/data -w /src maven:3.9-eclipse-temurin-2
 
 ## Tests
 
-- 67 JUnit tests over NativeStore and LMDB: recording and scopes, the ring and catch-up, no `values.dat` growth, protection, concurrent commits, old snapshots, failed commits, restarts, a changed slot count, wrapping an existing store, and the configuration through `LocalRepositoryManager`.
+- 73 JUnit tests over NativeStore and LMDB: recording and scopes, the ring and catch-up, no `values.dat` growth, protection, hiding from queries, reads and generic updates over all graphs, concurrent commits, old snapshots, failed commits, restarts, a changed slot count, wrapping an existing store, and the configuration through `LocalRepositoryManager`.
 - 18 Django tests with a mocked RDF4J: template choice, `create_remote()` status codes, `enable_changelog`/`disable_changelog` incl. dry run and kept indexes.
 - End to end with the image and authproxy: the RDF4J answers (204 new, 409 existing, 400 for an unknown Sail type), enabling on a repository with authproxy's oldest template without data loss, an edit (`cl:Nodes`), a curation update (`cl:Summary`), a rejected write to the log, `DROP ALL` (`cl:Everything`, log kept), catch-up after 2,010 updates, and the way back with `--purge-log`.

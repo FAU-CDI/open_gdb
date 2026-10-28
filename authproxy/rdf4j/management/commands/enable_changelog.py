@@ -25,8 +25,7 @@ class Command(BaseCommand):
     help = (
         "Wrap the store of existing repositories in the change log Sail (opengdb:ChangeLogSail). "
         "Only repositories with one of authproxy's default templates are changed; they keep their "
-        "triple indexes. Restart rdf4j afterwards. Repositories with the change log need WissKI 5 "
-        "or later."
+        "triple indexes. Restart rdf4j afterwards. Only WissKI 5 or later reads the log."
     )
 
     def add_arguments(self, parser):

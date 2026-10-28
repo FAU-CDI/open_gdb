@@ -359,8 +359,8 @@ config:rep.impl [
     ]
 ]."""
 
-# The same store inside the change log Sail of the open_gdb rdf4j image. Repositories with the
-# change log need WissKI 5 or later.
+# The same store inside the change log Sail of the open_gdb rdf4j image. Only WissKI 5 or later
+# reads the log; queries that don't name the log graph don't see it.
 CHANGELOG_TEMPLATE = """@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 @prefix config: <tag:rdf4j.org,2023:config/>.
 [] a config:Repository ;
