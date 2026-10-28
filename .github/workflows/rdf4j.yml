@@ -1,0 +1,66 @@
+name: Publish RDF4J Docker Image
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*.*.*"
+  pull_request:
+    paths:
+      - "rdf4j/**"
+      - ".github/workflows/rdf4j.yml"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: fau-cdi/open_gdb_rdf4j
+  PLATFORMS: linux/amd64,linux/arm64
+  CONTEXT_DIRECTORY: rdf4j
+  RDF4J_VERSION: 6.1.0
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - run: mvn -B -f rdf4j/changelog-sail/pom.xml verify
+
+  publish:
+    needs: verify
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ env.REGISTRY }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: "{{defaultContext}}:${{ env.CONTEXT_DIRECTORY }}"
+          build-args: |
+            RDF4J_VERSION=${{ env.RDF4J_VERSION }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: ${{ env.PLATFORMS }}
+          pull: true
+          push: true
