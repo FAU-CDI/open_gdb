@@ -31,9 +31,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("slugs", nargs="*", help="Repositories to change.")
         parser.add_argument("--all", action="store_true", help="Change all repositories.")
-        parser.add_argument(
-            "--dry-run", action="store_true", help="Only report what would change."
-        )
+        parser.add_argument("--dry-run", action="store_true", help="Only report what would change.")
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
@@ -41,16 +39,16 @@ class Command(BaseCommand):
         failed = []
         for repository in selected_repositories(options):
             slug = repository.slug
-            kind, indexes = changelog.classify(repository.turtle_template)
+            kind, variant = changelog.classify(repository.turtle_template)
             if kind == "changelog":
                 self.stdout.write(f"{slug}: has the change log already.")
                 continue
-            if kind == "custom":
+            if kind != "plain" or variant is None:
                 self.stdout.write(f"{slug}: custom template, not changed.")
                 continue
             try:
                 sail_types, live_indexes = changelog.live_config(slug)
-                if sail_types != [changelog.NATIVE_STORE] or live_indexes != [indexes]:
+                if sail_types != [variant.store] or live_indexes != [variant.indexes]:
                     self.stderr.write(
                         f"{slug}: RDF4J has another config (Sail types {sail_types}, triple indexes "
                         f"{live_indexes}) than the template; not changed."
@@ -58,14 +56,16 @@ class Command(BaseCommand):
                     failed.append(slug)
                     continue
                 if dry_run:
-                    self.stdout.write(f"{slug}: would get the change log (triple indexes {indexes}).")
+                    self.stdout.write(
+                        f"{slug}: would get the change log (triple indexes {variant.indexes})."
+                    )
                     continue
                 # The store doesn't have the Sail yet, so an old log can still be removed. The Sail
                 # then starts with a new epoch, and no WissKI mistakes it for a complete log.
                 if changelog.has_log(slug):
                     changelog.clear_log(slug)
                     self.stdout.write(f"{slug}: removed an old change log.")
-                repository.turtle_template = changelog.changelog_template(indexes)
+                repository.turtle_template = variant.changelog
                 changelog.post_config(repository)
             except changelog.RemoteError as error:
                 self.stderr.write(f"{slug}: {error}")
@@ -73,7 +73,7 @@ class Command(BaseCommand):
                 continue
             repository.save(update_fields=["turtle_template"])
             changed += 1
-            self.stdout.write(f"{slug}: change log enabled (triple indexes {indexes}).")
+            self.stdout.write(f"{slug}: change log enabled (triple indexes {variant.indexes}).")
 
         if changed:
             self.stdout.write("Restart the rdf4j service. RDF4J only rewrote config.ttl.")

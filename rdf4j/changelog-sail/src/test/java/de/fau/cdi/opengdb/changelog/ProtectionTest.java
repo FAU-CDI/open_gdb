@@ -13,8 +13,9 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
-import org.eclipse.rdf4j.repository.RepositoryException;
+import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.UpdateExecutionException;
+import org.eclipse.rdf4j.repository.RepositoryException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -106,6 +107,32 @@ class ProtectionTest extends StoreTest {
 		assertEquals(1, ((Literal) f.select("SELECT (COUNT(*) AS ?n) WHERE { ?s ?p ?o }").get(0).getValue("n"))
 				.longValue());
 		assertTrue(f.select("SELECT * WHERE { GRAPH <" + LOG_GRAPH + "> { <" + slot + "> ?p ?o } }").size() > 0,
+				"naming the log graph reads it");
+	}
+
+	@Test
+	void tripleTermQueriesDontSeeTheLog() {
+		Fixture f = fixture();
+		f.update("""
+				PREFIX ex: <http://example.org/>
+				PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+				INSERT DATA { ex:r rdf:reifies <<( ex:a ex:p ex:b )>> }
+				""");
+
+		List<BindingSet> rows = f.select("""
+				PREFIX ex: <http://example.org/>
+				PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+				SELECT ?s ?p ?o WHERE { ?r rdf:reifies <<( ?s ?p ?o )>> }
+				""");
+		assertEquals(1, rows.size());
+		assertEquals(ex("a"), rows.get(0).getValue("s"));
+		assertEquals(ex("p"), rows.get(0).getValue("p"));
+		assertEquals(ex("b"), rows.get(0).getValue("o"));
+		assertFalse(f.select("SELECT DISTINCT ?g WHERE { GRAPH ?g { ?s ?p ?o } }").stream()
+				.anyMatch(row -> LOG_GRAPH.equals(row.getValue("g"))));
+		assertEquals(1, ((Literal) f.select("SELECT (COUNT(*) AS ?n) WHERE { ?s ?p ?o }").get(0).getValue("n"))
+				.longValue());
+		assertTrue(f.select("SELECT * WHERE { GRAPH <" + LOG_GRAPH + "> { ?s ?p ?o } }").size() > 0,
 				"naming the log graph reads it");
 	}
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import functools
 import inspect
 from enum import Enum
@@ -201,9 +202,7 @@ class User(AbstractUser):
                     RepoPermission.permission_functions().keys(),
                 )
             )
-            for (
-                permission_model
-            ) in self.user_permissions.all():  # pylint: disable=no-member
+            for permission_model in self.user_permissions.all():  # pylint: disable=no-member
                 # Skip non-repo permissions
                 if permission_model.content_type.model_class() != Repository:
                     continue
@@ -220,9 +219,7 @@ class User(AbstractUser):
             "EXECUTE_COUNT": self.execute_count,
             "IGNORE_SHARED_QUERIES": self.ignore_shared_queries,
         }
-        data["dateCreated"] = int(
-            self.date_joined.timestamp()  # pylint: disable=no-member
-        )
+        data["dateCreated"] = int(self.date_joined.timestamp())  # pylint: disable=no-member
 
         return data
 
@@ -346,16 +343,23 @@ class Query(models.Model):
         UPDATE = "update"
 
 
-NATIVE_STORE_TEMPLATE = """@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+# WissKI reads with GRAPH ?g, so the context is never bound first. spoc serves entity loads
+# (<s> <p> ?o), posc class listings (?x a <C>) and inverse steps, ospc deletes and merges
+# (?s ?p <uri>).
+# The LMDB settings only exist in the lmdb# namespace; RDF4J silently ignores
+# config:lmdb.tripleIndexes. Without triple indexes, RDF4J 6.0 and 6.1 can't reopen the
+# store after a restart ("triple-indexes missing in store.properties file").
+LMDB_STORE_TEMPLATE = """@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 @prefix config: <tag:rdf4j.org,2023:config/>.
+@prefix lmdb: <http://rdf4j.org/config/sail/lmdb#>.
 [] a config:Repository ;
 config:rep.id "${slug}" ;
 rdfs:label "${description}" ;
 config:rep.impl [
     config:rep.type "openrdf:SailRepository" ;
     config:sail.impl [
-        config:sail.type "openrdf:NativeStore" ;
-        config:native.tripleIndexes "spoc,posc,cosp"
+        config:sail.type "rdf4j:LmdbStore" ;
+        lmdb:tripleIndexes "spoc,posc,ospc"
     ]
 ]."""
 
@@ -363,6 +367,7 @@ config:rep.impl [
 # reads the log; queries that don't name the log graph don't see it.
 CHANGELOG_TEMPLATE = """@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
 @prefix config: <tag:rdf4j.org,2023:config/>.
+@prefix lmdb: <http://rdf4j.org/config/sail/lmdb#>.
 [] a config:Repository ;
 config:rep.id "${slug}" ;
 rdfs:label "${description}" ;
@@ -371,8 +376,8 @@ config:rep.impl [
     config:sail.impl [
         config:sail.type "opengdb:ChangeLogSail" ;
         config:delegate [
-            config:sail.type "openrdf:NativeStore" ;
-            config:native.tripleIndexes "spoc,posc,cosp"
+            config:sail.type "rdf4j:LmdbStore" ;
+            lmdb:tripleIndexes "spoc,posc,ospc"
         ]
     ]
 ]."""
@@ -380,7 +385,7 @@ config:rep.impl [
 
 def default_turtle_template() -> str:
     """Template for new repositories: with the change log if RDF4J_CHANGELOG is set."""
-    return CHANGELOG_TEMPLATE if RDF4J_CHANGELOG else NATIVE_STORE_TEMPLATE
+    return CHANGELOG_TEMPLATE if RDF4J_CHANGELOG else LMDB_STORE_TEMPLATE
 
 
 class Repository(models.Model):
@@ -390,10 +395,10 @@ class Repository(models.Model):
         """Error when there's no remote for a repo"""
 
         def __init__(
-                self,
-                repository_id: str,
-                status_code: int | None = None,
-                detail: str = "",
+            self,
+            repository_id: str,
+            status_code: int | None = None,
+            detail: str = "",
         ) -> None:
             parts = [f"RDF4J size request failed for repository {repository_id!r}"]
             if status_code is not None:
@@ -404,8 +409,6 @@ class Repository(models.Model):
             self.repository_id = repository_id
             self.status_code = status_code
 
-    DEFAULT_TEMPLATE = NATIVE_STORE_TEMPLATE
-    CHANGELOG_TEMPLATE = CHANGELOG_TEMPLATE
     # config:sail.iterationCacheSyncThreshold "10000";
     # config:sail.defaultQueryEvaluationMode "STANDARD";
 
@@ -473,9 +476,7 @@ Available variables:
         if not permissions:
             permissions = RepoPermission.permission_functions()
 
-        repo_content_type = ContentType.objects.get(
-            app_label="rdf4j", model="repository"
-        )
+        repo_content_type = ContentType.objects.get(app_label="rdf4j", model="repository")
 
         for name in permissions:
             perm = RepoPermission.objects.create(
@@ -595,9 +596,7 @@ Available variables:
             "Accept": "application/sparql-results+json",
         }
 
-        response = requests.post(
-            url=url, data=sparql, headers=headers, timeout=REQUEST_TIMEOUT
-        )
+        response = requests.post(url=url, data=sparql, headers=headers, timeout=REQUEST_TIMEOUT)
 
         if response.status_code != 200:
             return {"message": response.text}

@@ -6,6 +6,7 @@ import java.util.Set;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
+import org.eclipse.rdf4j.model.TripleTerm;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 
@@ -65,12 +66,10 @@ final class ChangeBuffer {
 		if (subject.isIRI()) {
 			node((IRI) subject);
 		} else {
-			// Blank nodes and triple terms can't be resolved to entities by IRI.
+			// A blank node can't be resolved to an entity by IRI. RDF 1.2 triple terms are not subjects.
 			downgrade(Scope.SUMMARY);
 		}
-		if (object.isIRI()) {
-			node((IRI) object);
-		}
+		term(object);
 		predicate(predicate);
 		if (RDF.TYPE.equals(predicate) && object.isIRI()) {
 			type((IRI) object);
@@ -155,6 +154,24 @@ final class ChangeBuffer {
 	/** The graphs. Empty with {@link Scope#EVERYTHING} means all graphs. */
 	Set<IRI> graphs() {
 		return Collections.unmodifiableSet(graphs);
+	}
+
+	/**
+	 * An IRI, or the IRIs inside an RDF 1.2 triple term. Triple terms occur in object position. Their
+	 * subject is an IRI or a blank node, and they can nest in the object. A blank node inside adds
+	 * nothing: it has no IRI a cache could hold.
+	 */
+	private void term(Value value) {
+		if (value.isIRI()) {
+			node((IRI) value);
+		} else if (value instanceof TripleTerm triple) {
+			Resource inner = triple.getSubject();
+			if (inner.isIRI()) {
+				node((IRI) inner);
+			}
+			node(triple.getPredicate());
+			term(triple.getObject());
+		}
 	}
 
 	private void node(IRI iri) {

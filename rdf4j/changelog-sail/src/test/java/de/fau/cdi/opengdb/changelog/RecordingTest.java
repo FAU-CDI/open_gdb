@@ -96,6 +96,26 @@ class RecordingTest extends StoreTest {
 	}
 
 	@Test
+	void tripleTermObjectListsItsIris() {
+		Fixture f = fixture();
+		f.update("""
+				PREFIX ex: <http://example.org/>
+				PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+				INSERT DATA {
+				  ex:r rdf:reifies <<( ex:a ex:p <<( ex:c ex:q "secret value" )>> )>>
+				}
+				""");
+
+		Rec rec = f.last();
+		assertEquals(NODES, rec.scope());
+		assertEquals(Set.of(ex("r"), ex("a"), ex("p"), ex("c"), ex("q")), rec.nodes());
+		assertEquals(Set.of(RDF.REIFIES), rec.predicates());
+		for (Statement statement : f.logGraph()) {
+			assertFalse(statement.getObject().stringValue().contains("secret"), "literal value in the log");
+		}
+	}
+
+	@Test
 	void blankNodeSubjectMakesSummary() {
 		Fixture f = fixture();
 		f.update("INSERT DATA { _:b <http://example.org/p> <http://example.org/o> }");

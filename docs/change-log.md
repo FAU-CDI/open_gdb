@@ -32,7 +32,7 @@ A record lists IRIs, not statements, at the level of detail the transaction allo
 
 | Scope | When | What WissKI refreshes |
 |---|---|---|
-| `cl:Nodes` | Up to 200 distinct IRIs | The entities owning the IRIs. |
+| `cl:Nodes` | Up to 200 distinct IRIs, including the IRIs inside a triple term | The entities owning the IRIs. |
 | `cl:Summary` | More IRIs, blank-node subjects, removes by predicate | Bundles whose paths use the predicates or classes. |
 | `cl:Everything` | Cleared graphs, more than 100 predicates, classes or graphs | Everything shown from the listed graphs. |
 
@@ -66,7 +66,7 @@ The Sail wraps the evaluation strategy factory of the store below and gives quer
 
 The log is still opt-in: `RDF4J_CHANGELOG=1` for new repositories, `enable_changelog` for existing ones.
 
-`enable_changelog` keeps each repository's triple indexes (authproxy's older defaults differ, and changed indexes would make NativeStore rebuild them on start), checks the configuration RDF4J has stored, and removes a stale log graph, so the Sail starts a new epoch. `disable_changelog` goes back; `--purge-log` removes the graph after the restart.
+`enable_changelog` keeps each repository's store and triple indexes (authproxy's older defaults differ; NativeStore rebuilds changed indexes on start, and LMDB in RDF4J 6.0 and 6.1 refuses to reopen when they are missing), checks the configuration RDF4J has stored, and removes a stale log graph, so the Sail starts a new epoch. `disable_changelog` goes back; `--purge-log` removes the graph after the restart.
 
 ## Performance
 
@@ -108,6 +108,6 @@ docker run --rm -v "$PWD":/src -v perf:/data -w /src maven:3.9-eclipse-temurin-2
 
 ## Tests
 
-- 73 JUnit tests over NativeStore and LMDB: recording and scopes, the ring and catch-up, no `values.dat` growth, protection, hiding from queries, reads and generic updates over all graphs, concurrent commits, old snapshots, failed commits, restarts, a changed slot count, wrapping an existing store, and the configuration through `LocalRepositoryManager`.
-- 18 Django tests with a mocked RDF4J: template choice, `create_remote()` status codes, `enable_changelog`/`disable_changelog` incl. dry run and kept indexes.
+- 77 JUnit tests over NativeStore and LMDB: recording and scopes, RDF 1.2 triple terms, the ring and catch-up, no `values.dat` growth, protection, hiding from queries, reads and generic updates over all graphs, concurrent commits, old snapshots, failed commits, restarts, a changed slot count, wrapping an existing store, and the configuration through `LocalRepositoryManager`.
+- 19 Django tests with a mocked RDF4J: template choice, `create_remote()` status codes, `enable_changelog`/`disable_changelog` incl. dry run and kept stores and indexes.
 - End to end with the image and authproxy: the RDF4J answers (204 new, 409 existing, 400 for an unknown Sail type), enabling on a repository with authproxy's oldest template without data loss, an edit (`cl:Nodes`), a curation update (`cl:Summary`), a rejected write to the log, `DROP ALL` (`cl:Everything`, log kept), catch-up after 2,010 updates, and the way back with `--purge-log`.

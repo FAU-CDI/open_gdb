@@ -93,14 +93,16 @@ The `rdf4j` image contains a Sail that records every committed change of a repos
 
 ### Configuration
 
-New repositories with `RDF4J_CHANGELOG=1` get this store configuration (see `Repository.CHANGELOG_TEMPLATE`):
+New repositories with `RDF4J_CHANGELOG=1` get this store configuration (see `CHANGELOG_TEMPLATE` in `authproxy/rdf4j/models.py`):
 
 ```turtle
+@prefix lmdb: <http://rdf4j.org/config/sail/lmdb#> .
+
 config:sail.impl [
     config:sail.type "opengdb:ChangeLogSail" ;
     config:delegate [
-        config:sail.type "openrdf:NativeStore" ;
-        config:native.tripleIndexes "spoc,posc,cosp"
+        config:sail.type "rdf4j:LmdbStore" ;
+        lmdb:tripleIndexes "spoc,posc,ospc"
     ]
 ]
 ```
@@ -130,7 +132,7 @@ Rule of thumb: `cl:slots` ≥ saves per minute × 4 × minutes without a read ×
 
 #### Changing a parameter of an existing repository
 
-`enable_changelog` uses the defaults. To change `cl:slots` (or another parameter) later, insert it into the configuration RDF4J has stored, post it back, and restart rdf4j. Fetching the stored configuration keeps the repository's label and triple indexes; changed indexes would make NativeStore rebuild them on start.
+`enable_changelog` uses the defaults. To change `cl:slots` (or another parameter) later, insert it into the configuration RDF4J has stored, post it back, and restart rdf4j. Fetching the stored configuration keeps the repository's label and triple indexes. NativeStore rebuilds its indexes when they change, and LMDB in RDF4J 6.0 and 6.1 refuses to reopen a store whose triple indexes are missing.
 
 ```bash
 docker compose exec authproxy sh -c '
@@ -155,7 +157,7 @@ docker compose exec authproxy python manage.py enable_changelog --all   # or nam
 docker compose restart rdf4j
 ```
 
-`enable_changelog` keeps each repository's triple indexes (older defaults differ, and changed indexes would make NativeStore rebuild them on start), checks the configuration RDF4J has stored, removes a stale log graph, and posts the new configuration to `/repositories/{id}/config`. That only rewrites `config.ttl`; RDF4J uses it after the restart, which affects all repositories of the server. Afterwards `GET /rdf4j-server/repositories/{id}/config` shows `opengdb:ChangeLogSail`, and `/size` is unchanged (it leaves the log out; `/size?context=<tag:fau-cdi.github.io,2026:opengdb/changelog>` counts the log).
+`enable_changelog` keeps each repository's store and triple indexes (older defaults differ; NativeStore rebuilds changed indexes on start, and LMDB in RDF4J 6.0 and 6.1 refuses to reopen when they are missing), checks the configuration RDF4J has stored, removes a stale log graph, and posts the new configuration to `/repositories/{id}/config`. That only rewrites `config.ttl`; RDF4J uses it after the restart, which affects all repositories of the server. Afterwards `GET /rdf4j-server/repositories/{id}/config` shows `opengdb:ChangeLogSail`, and `/size` is unchanged (it leaves the log out; `/size?context=<tag:fau-cdi.github.io,2026:opengdb/changelog>` counts the log).
 
 Back to the plain store:
 
@@ -179,14 +181,14 @@ WissKI keeps the namespace in one constant. Tell the WissKI side if anything her
   |---|---|
   | `cl:slot-k cl:index "k"^^xsd:long`, `cl:cycle "c"^^xsd:long` | Revision `c × R + k`. |
   | `cl:slot-k cl:scope cl:Nodes / cl:Summary / cl:Everything` | Level of detail. |
-  | `cl:slot-k cl:node <iri>` | Only with `cl:Nodes`: every IRI subject and IRI object of a written statement. |
+  | `cl:slot-k cl:node <iri>` | Only with `cl:Nodes`: every IRI subject and IRI object of a written statement, and every IRI inside an RDF 1.2 triple term in object position. |
   | `cl:slot-k cl:predicate <iri>`, `cl:class <iri>` | Predicates, and IRI objects of `rdf:type`. Not with `cl:Everything`. |
   | `cl:slot-k cl:graph <iri>` | Graphs; `cl:defaultGraph` for the default graph and for calls without a graph. With `cl:Everything`, no graph means all graphs. |
 
   | Scope | When |
   |---|---|
   | `cl:Nodes` | Up to `cl:maxNodes` distinct IRIs. |
-  | `cl:Summary` | More IRIs, a blank-node or triple-term subject, or a remove with only the predicate bound. |
+  | `cl:Summary` | More IRIs, a blank-node subject, or a remove with only the predicate bound. |
   | `cl:Everything` | Cleared graphs (also `DROP ALL`/`CLEAR ALL`, which keep the log), a remove bound only by graph, `rdf:type` removed by pattern, or more than `cl:maxTerms` predicates, classes or graphs. |
 
 - Summary index for consumers that fell behind the ring: `cl:p-{h} cl:predicate <P>`, `cl:c-{h} cl:class <C>`, `cl:g-{h} cl:graph <G>`, each with `cl:lastSlot` and `cl:lastCycle` of the newest record that touched it. `{h}` is the first 16 hex digits of the SHA-256 of the IRI.

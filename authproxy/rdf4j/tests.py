@@ -14,7 +14,10 @@ from django.db.utils import IntegrityError
 from django.test import TestCase
 
 from . import changelog
-from .models import CHANGELOG_TEMPLATE, NATIVE_STORE_TEMPLATE, Repository, default_turtle_template
+from .models import CHANGELOG_TEMPLATE, LMDB_STORE_TEMPLATE, Repository, default_turtle_template
+
+NATIVE_INDEXES = "tag:rdf4j.org,2023:config/native.tripleIndexes"
+LMDB_INDEXES = "http://rdf4j.org/config/sail/lmdb#tripleIndexes"
 
 
 def response(status_code=200, text="", json=None):
@@ -23,10 +26,12 @@ def response(status_code=200, text="", json=None):
     return fake
 
 
-def live_config(*sail_types, indexes="spoc,posc,cosp"):
+def live_config(*sail_types, indexes="spoc,posc,ospc", index_iri=LMDB_INDEXES):
     """A repository config as RDF4J returns it in N-Triples."""
-    lines = [f'_:impl{i} <tag:rdf4j.org,2023:config/sail.type> "{t}" .' for i, t in enumerate(sail_types)]
-    lines.append(f'_:impl{len(sail_types) - 1} <tag:rdf4j.org,2023:config/native.tripleIndexes> "{indexes}" .')
+    lines = [
+        f'_:impl{i} <tag:rdf4j.org,2023:config/sail.type> "{t}" .' for i, t in enumerate(sail_types)
+    ]
+    lines.append(f'_:impl{len(sail_types) - 1} <{index_iri}> "{indexes}" .')
     lines.append('_:repo <tag:rdf4j.org,2023:config/rep.id> "x" .')
     return response(200, "\n".join(lines) + "\n")
 
@@ -60,10 +65,16 @@ class RemoteMixin:
 
 
 class TemplateTests(RemoteMixin, TestCase):
-    def test_default_is_the_plain_store(self):
-        self.assertEqual(default_turtle_template(), NATIVE_STORE_TEMPLATE)
+    def test_default_is_the_lmdb_store(self):
+        self.assertEqual(default_turtle_template(), LMDB_STORE_TEMPLATE)
         repository = Repository.objects.create(slug="plain", description="Plain")
-        self.assertEqual(repository.turtle_template, NATIVE_STORE_TEMPLATE)
+        self.assertEqual(repository.turtle_template, LMDB_STORE_TEMPLATE)
+        turtle = repository.to_turtle()
+        self.assertIn('config:sail.type "rdf4j:LmdbStore"', turtle)
+        self.assertIn("@prefix lmdb: <http://rdf4j.org/config/sail/lmdb#>.", turtle)
+        self.assertIn('lmdb:tripleIndexes "spoc,posc,ospc"', turtle)
+        self.assertNotIn("NativeStore", turtle)
+        self.assertNotIn("config:lmdb.", turtle)
 
     def test_setting_switches_new_repositories_to_the_change_log(self):
         with mock.patch("rdf4j.models.RDF4J_CHANGELOG", True):
@@ -71,26 +82,75 @@ class TemplateTests(RemoteMixin, TestCase):
         self.assertEqual(repository.turtle_template, CHANGELOG_TEMPLATE)
         turtle = self.models_requests.put.call_args.kwargs["data"]
         self.assertIn('config:sail.type "opengdb:ChangeLogSail"', turtle)
+        self.assertIn('config:sail.type "rdf4j:LmdbStore"', turtle)
+        self.assertIn('lmdb:tripleIndexes "spoc,posc,ospc"', turtle)
         self.assertIn('config:rep.id "logged"', turtle)
+        self.assertNotIn("NativeStore", turtle)
 
     def test_templates_have_no_other_placeholders(self):
-        for template in (NATIVE_STORE_TEMPLATE, CHANGELOG_TEMPLATE):
+        for template in (LMDB_STORE_TEMPLATE, CHANGELOG_TEMPLATE):
             repository = Repository(slug="s", description="d", turtle_template=template)
             self.assertNotIn("$", repository.to_turtle())
 
     def test_classify_knows_every_earlier_default(self):
         expected = {
-            "0001_initial": "spoc,opsc,cspo",
-            "0002_alter_repository_turtle_template": "spoc,posc,cspo",
-            "0003_alter_repository_turtle_template": "spoc,posc",
-            "0004_alter_repository_turtle_template": "spoc,posc,cosp",
+            "0001_initial": (
+                changelog.NATIVE_STORE,
+                "spoc,opsc,cspo",
+                "config:native.tripleIndexes",
+            ),
+            "0002_alter_repository_turtle_template": (
+                changelog.NATIVE_STORE,
+                "spoc,posc,cspo",
+                "config:native.tripleIndexes",
+            ),
+            "0003_alter_repository_turtle_template": (
+                changelog.NATIVE_STORE,
+                "spoc,posc",
+                "config:native.tripleIndexes",
+            ),
+            "0004_alter_repository_turtle_template": (
+                changelog.NATIVE_STORE,
+                "spoc,posc,cosp",
+                "config:native.tripleIndexes",
+            ),
+            "0005_alter_repository_turtle_template": (
+                changelog.LMDB_STORE,
+                "spoc,posc,cosp",
+                "config:lmdb.tripleIndexes",
+            ),
+            "0006_turtle_template_wisski_indexes": (
+                changelog.LMDB_STORE,
+                "spoc,posc,ospc",
+                "config:lmdb.tripleIndexes",
+            ),
+            "0007_lmdb_triple_indexes_namespace": (
+                changelog.LMDB_STORE,
+                "spoc,posc,ospc",
+                "lmdb:tripleIndexes",
+            ),
         }
-        for name, indexes in expected.items():
-            self.assertEqual(changelog.classify(migration_default(name)), ("plain", indexes), name)
-        self.assertEqual(changelog.classify(CHANGELOG_TEMPLATE), ("changelog", "spoc,posc,cosp"))
+        for name, (store, indexes, predicate) in expected.items():
+            kind, variant = changelog.classify(migration_default(name))
+            self.assertEqual(kind, "plain", name)
+            self.assertEqual(variant.store, store, name)
+            self.assertEqual(variant.indexes, indexes, name)
+            self.assertIn(predicate, variant.plain, name)
+            self.assertIn(predicate, variant.changelog, name)
+            self.assertIn("opengdb:ChangeLogSail", variant.changelog, name)
+            if predicate == "config:lmdb.tripleIndexes":
+                self.assertNotIn("lmdb:tripleIndexes", variant.changelog, name)
+            if predicate == "lmdb:tripleIndexes":
+                self.assertNotIn("config:lmdb.", variant.plain, name)
+            self.assertEqual(changelog.classify(variant.changelog), ("changelog", variant), name)
+        kind, current = changelog.classify(LMDB_STORE_TEMPLATE)
+        self.assertEqual((kind, current.changelog), ("plain", CHANGELOG_TEMPLATE))
+        self.assertEqual(changelog.classify(CHANGELOG_TEMPLATE), ("changelog", current))
         # Whitespace doesn't matter.
-        self.assertEqual(changelog.classify("  " + NATIVE_STORE_TEMPLATE.replace("\n", "\n\n")),
-                         ("plain", "spoc,posc,cosp"))
+        self.assertEqual(
+            changelog.classify("  " + LMDB_STORE_TEMPLATE.replace("\n", "\n\n")),
+            ("plain", current),
+        )
         self.assertEqual(changelog.classify("custom"), ("custom", None))
 
 
@@ -98,20 +158,20 @@ class CreateRemoteTests(RemoteMixin, TestCase):
     def test_created(self):
         for status in (200, 201, 204):
             self.models_requests.put.return_value = response(status)
-            self.create(f"created{status}", NATIVE_STORE_TEMPLATE)
+            self.create(f"created{status}", LMDB_STORE_TEMPLATE)
             self.assertTrue(Repository.objects.filter(slug=f"created{status}").exists())
 
     def test_existing_repository_keeps_the_row(self):
         self.models_requests.put.return_value = response(
             409, "REPOSITORY EXISTS: repository already exists: existing"
         )
-        self.create("existing", NATIVE_STORE_TEMPLATE)
+        self.create("existing", LMDB_STORE_TEMPLATE)
         self.assertTrue(Repository.objects.filter(slug="existing").exists())
         self.models_requests.delete.assert_not_called()
 
     def test_already_exists_in_body_of_400(self):
         self.models_requests.put.return_value = response(400, "Repository already exists")
-        self.create("existing", NATIVE_STORE_TEMPLATE)
+        self.create("existing", LMDB_STORE_TEMPLATE)
         self.assertTrue(Repository.objects.filter(slug="existing").exists())
 
     def test_other_errors_raise(self):
@@ -132,17 +192,25 @@ class EnableChangelogTests(RemoteMixin, TestCase):
         self.requests = patcher.start()
         self.addCleanup(patcher.stop)
         self.requests.post.return_value = response(204)
-        self.default = self.create("default", NATIVE_STORE_TEMPLATE)
+        self.default = self.create("default", LMDB_STORE_TEMPLATE)
         self.old = self.create("old", migration_default("0001_initial"))
-        self.custom = self.create("custom", NATIVE_STORE_TEMPLATE.replace("NativeStore", "MemoryStore"))
+        self.ignored = self.create(
+            "ignored", migration_default("0006_turtle_template_wisski_indexes")
+        )
+        self.custom = self.create("custom", LMDB_STORE_TEMPLATE.replace("LmdbStore", "MemoryStore"))
         self.logged = self.create("logged", CHANGELOG_TEMPLATE)
 
         def get(url, **kwargs):
-            if url.endswith("/old/config"):
-                return live_config("openrdf:NativeStore", indexes="spoc,opsc,cspo")
-            if url.endswith("/config"):
-                return live_config("openrdf:NativeStore")
-            return response(200, json={"boolean": False})
+            if not url.endswith("/config"):
+                return response(200, json={"boolean": False})
+            slug = url.rstrip("/").split("/")[-2]
+            if slug == "old":
+                return live_config(
+                    changelog.NATIVE_STORE, indexes="spoc,opsc,cspo", index_iri=NATIVE_INDEXES
+                )
+            if slug == "ignored":
+                return live_config(changelog.LMDB_STORE, indexes="spoc,posc,ospc")
+            return live_config(changelog.LMDB_STORE)
 
         self.requests.get.side_effect = get
 
@@ -156,43 +224,64 @@ class EnableChangelogTests(RemoteMixin, TestCase):
 
         self.default.refresh_from_db()
         self.old.refresh_from_db()
+        self.ignored.refresh_from_db()
         self.custom.refresh_from_db()
         self.assertEqual(self.default.turtle_template, CHANGELOG_TEMPLATE)
-        self.assertEqual(changelog.classify(self.old.turtle_template), ("changelog", "spoc,opsc,cspo"))
+        self.assertEqual(changelog.classify(self.old.turtle_template)[1].indexes, "spoc,opsc,cspo")
+        self.assertEqual(
+            changelog.classify(self.old.turtle_template)[1].store, changelog.NATIVE_STORE
+        )
+        self.assertIn("config:lmdb.tripleIndexes", self.ignored.turtle_template)
+        self.assertNotIn("lmdb:tripleIndexes", self.ignored.turtle_template)
         self.assertIn("MemoryStore", self.custom.turtle_template)
         self.assertIn("custom: custom template, not changed.", output)
         self.assertIn("logged: has the change log already.", output)
         self.assertIn("Restart the rdf4j service. RDF4J only rewrote config.ttl.", output)
 
         posted = {call.args[0]: call.kwargs for call in self.requests.post.call_args_list}
-        old_turtle = posted["http://rdf4j:8080/rdf4j-server/repositories/old/config"]["data"].decode()
+        old_turtle = posted["http://rdf4j:8080/rdf4j-server/repositories/old/config"][
+            "data"
+        ].decode()
         self.assertIn("opengdb:ChangeLogSail", old_turtle)
+        self.assertIn("openrdf:NativeStore", old_turtle)
+        self.assertNotIn("LmdbStore", old_turtle)
         self.assertIn('"spoc,opsc,cspo"', old_turtle)
         self.assertIn('config:rep.id "old"', old_turtle)
-        self.assertEqual(len(posted), 2)
+        default_turtle = posted["http://rdf4j:8080/rdf4j-server/repositories/default/config"][
+            "data"
+        ].decode()
+        self.assertIn("opengdb:ChangeLogSail", default_turtle)
+        self.assertIn("rdf4j:LmdbStore", default_turtle)
+        self.assertIn('lmdb:tripleIndexes "spoc,posc,ospc"', default_turtle)
+        ignored_turtle = posted["http://rdf4j:8080/rdf4j-server/repositories/ignored/config"][
+            "data"
+        ].decode()
+        self.assertIn('config:lmdb.tripleIndexes "spoc,posc,ospc"', ignored_turtle)
+        self.assertNotIn("lmdb:tripleIndexes", ignored_turtle)
+        self.assertEqual(len(posted), 3)
 
     def test_dry_run_changes_nothing(self):
         output = self.run_command("--all", "--dry-run")
 
         self.default.refresh_from_db()
-        self.assertEqual(self.default.turtle_template, NATIVE_STORE_TEMPLATE)
+        self.assertEqual(self.default.turtle_template, LMDB_STORE_TEMPLATE)
         self.requests.post.assert_not_called()
         self.assertIn("default: would get the change log", output)
 
     def test_other_live_config_is_not_changed(self):
         self.requests.get.side_effect = lambda url, **kwargs: live_config(
-            "openrdf:NativeStore", indexes="spoc"
+            changelog.LMDB_STORE, indexes="spoc"
         )
         with self.assertRaises(CommandError):
             self.run_command("default")
         self.default.refresh_from_db()
-        self.assertEqual(self.default.turtle_template, NATIVE_STORE_TEMPLATE)
+        self.assertEqual(self.default.turtle_template, LMDB_STORE_TEMPLATE)
         self.requests.post.assert_not_called()
 
     def test_old_log_is_removed_first(self):
         def get(url, **kwargs):
             if url.endswith("/config"):
-                return live_config("openrdf:NativeStore")
+                return live_config(changelog.LMDB_STORE)
             return response(200, json={"boolean": True})
 
         self.requests.get.side_effect = get
@@ -211,7 +300,7 @@ class EnableChangelogTests(RemoteMixin, TestCase):
         with self.assertRaises(CommandError):
             self.run_command("default")
         self.default.refresh_from_db()
-        self.assertEqual(self.default.turtle_template, NATIVE_STORE_TEMPLATE)
+        self.assertEqual(self.default.turtle_template, LMDB_STORE_TEMPLATE)
 
     def test_needs_slugs_or_all(self):
         with self.assertRaises(CommandError):
@@ -236,13 +325,29 @@ class DisableChangelogTests(RemoteMixin, TestCase):
 
     def test_unwraps_and_keeps_indexes(self):
         self.requests.get.return_value = live_config(
-            "opengdb:ChangeLogSail", "openrdf:NativeStore", indexes="spoc,posc"
+            changelog.CHANGELOG_SAIL,
+            changelog.NATIVE_STORE,
+            indexes="spoc,posc",
+            index_iri=NATIVE_INDEXES,
         )
         output = self.run_command("logged")
 
         self.logged.refresh_from_db()
         self.assertEqual(self.logged.turtle_template, changelog.plain_template("spoc,posc"))
+        self.assertIn("openrdf:NativeStore", self.logged.turtle_template)
+        self.assertNotIn("LmdbStore", self.logged.turtle_template)
         self.assertIn("--purge-log", output)
+
+    def test_unwraps_the_lmdb_store(self):
+        self.logged.turtle_template = CHANGELOG_TEMPLATE
+        self.logged.save()
+        self.requests.get.return_value = live_config(
+            changelog.CHANGELOG_SAIL, changelog.LMDB_STORE, indexes="spoc,posc,ospc"
+        )
+        self.run_command("logged")
+
+        self.logged.refresh_from_db()
+        self.assertEqual(self.logged.turtle_template, LMDB_STORE_TEMPLATE)
 
     def test_purge_removes_the_log(self):
         self.logged.turtle_template = changelog.plain_template("spoc,posc")

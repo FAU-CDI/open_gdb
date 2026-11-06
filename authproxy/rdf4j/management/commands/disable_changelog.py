@@ -16,9 +16,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("slugs", nargs="*", help="Repositories to change.")
         parser.add_argument("--all", action="store_true", help="Change all repositories.")
-        parser.add_argument(
-            "--dry-run", action="store_true", help="Only report what would change."
-        )
+        parser.add_argument("--dry-run", action="store_true", help="Only report what would change.")
         parser.add_argument(
             "--purge-log",
             action="store_true",
@@ -35,14 +33,14 @@ class Command(BaseCommand):
         failed = []
         for repository in selected_repositories(options):
             slug = repository.slug
-            kind, indexes = changelog.classify(repository.turtle_template)
-            if kind != "changelog":
+            kind, variant = changelog.classify(repository.turtle_template)
+            if kind != "changelog" or variant is None:
                 self.stdout.write(f"{slug}: has no change log template, not changed.")
                 continue
             try:
                 sail_types, live_indexes = changelog.live_config(slug)
-                expected = sorted([changelog.CHANGELOG_SAIL, changelog.NATIVE_STORE])
-                if sail_types != expected or live_indexes != [indexes]:
+                expected = sorted([changelog.CHANGELOG_SAIL, variant.store])
+                if sail_types != expected or live_indexes != [variant.indexes]:
                     self.stderr.write(
                         f"{slug}: RDF4J has another config (Sail types {sail_types}, triple indexes "
                         f"{live_indexes}) than the template; not changed."
@@ -52,7 +50,7 @@ class Command(BaseCommand):
                 if dry_run:
                     self.stdout.write(f"{slug}: would lose the change log.")
                     continue
-                repository.turtle_template = changelog.plain_template(indexes)
+                repository.turtle_template = variant.plain
                 changelog.post_config(repository)
             except changelog.RemoteError as error:
                 self.stderr.write(f"{slug}: {error}")
