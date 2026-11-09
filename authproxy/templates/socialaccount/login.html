@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Sign in · Open GDB{% endblock %}
+{% block content %}
+    {% if process == "connect" %}
+        <h1>Connect {{ provider.name }}</h1>
+        <p class="subtitle">
+            You are about to connect a third-party account from {{ provider.name }}.
+        </p>
+    {% else %}
+        <h1>Sign in with {{ provider.name }}</h1>
+        <p class="subtitle">
+            You are about to sign in using your {{ provider.name }} account.
+        </p>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">Continue</button>
+    </form>
+{% endblock %}

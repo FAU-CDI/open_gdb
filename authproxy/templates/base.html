@@ -1,0 +1,288 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Open GDB{% endblock %}</title>
+    <style>
+        :root {
+            --base-ink: #262626;
+            --base-orange: #ffa933;
+            --base-orange-dark: #f29400;
+            --base-bg: #f7f6f3;
+            --base-muted: #6b6b6b;
+            --base-border: #e3e1dc;
+            --base-white: #ffffff;
+            --base-danger: #b3261e;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100%;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: var(--base-bg);
+            color: var(--base-ink);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                "Helvetica Neue", Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a {
+            color: var(--base-ink);
+        }
+
+        main {
+            flex: 1 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 20px;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            background: var(--base-white);
+            border: 1px solid var(--base-border);
+            border-radius: 12px;
+            padding: 40px 36px;
+            box-shadow: 0 10px 30px rgba(38, 38, 38, 0.06);
+        }
+
+        .brand {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 28px;
+        }
+
+        .brand img {
+            height: 48px;
+            width: auto;
+            display: block;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0 0 8px;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--base-muted);
+            font-size: 0.95rem;
+            margin: 0 0 28px;
+        }
+
+        .messages {
+            list-style: none;
+            margin: 0 0 16px;
+            padding: 12px 14px;
+            background: #fff4e0;
+            border: 1px solid #ffe0a8;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: var(--base-ink);
+        }
+
+        .form-errors {
+            margin: 0 0 16px;
+            padding: 12px 14px;
+            background: #fbeae9;
+            border: 1px solid #f3c1bd;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: var(--base-danger);
+        }
+
+        .form-errors ul {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        .field {
+            margin-bottom: 18px;
+        }
+
+        .field label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .field input[type="text"],
+        .field input[type="password"],
+        .field input[type="email"] {
+            width: 100%;
+            padding: 11px 12px;
+            font-size: 1rem;
+            border: 1px solid var(--base-border);
+            border-radius: 8px;
+            background: var(--base-white);
+            color: var(--base-ink);
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .field input:focus {
+            border-color: var(--base-orange);
+            box-shadow: 0 0 0 3px rgba(255, 169, 51, 0.25);
+        }
+
+        .field-errors {
+            margin-top: 6px;
+            font-size: 0.82rem;
+            color: var(--base-danger);
+        }
+
+        .field .help-text {
+            margin-top: 6px;
+            font-size: 0.82rem;
+            color: var(--base-muted);
+        }
+
+        .field .help-text a {
+            color: var(--base-ink);
+            text-decoration: underline;
+        }
+
+        .remember {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 22px;
+            font-size: 0.9rem;
+            color: var(--base-muted);
+            cursor: pointer;
+        }
+
+        .remember input {
+            accent-color: var(--base-orange);
+            width: 16px;
+            height: 16px;
+        }
+
+        .btn {
+            display: inline-block;
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .btn-primary {
+            background-color: var(--base-orange);
+            color: var(--base-ink);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--base-orange-dark);
+        }
+
+        .btn-sso {
+            background-color: var(--base-white);
+            color: var(--base-ink);
+            border-color: var(--base-border);
+        }
+
+        .btn-sso:hover {
+            background-color: var(--base-bg);
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 24px 0 16px;
+            color: var(--base-muted);
+            font-size: 0.85rem;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--base-border);
+        }
+
+        .signup {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--base-muted);
+        }
+
+        .signup a {
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .signup a:hover {
+            text-decoration: underline;
+        }
+
+        .footer-rule {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 auto;
+            padding: 24px 20px 32px;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .footer-rule .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--base-orange);
+            flex: none;
+        }
+
+        .footer-rule .line {
+            height: 1px;
+            flex: 1;
+            background: var(--base-border);
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <div class="login-card">
+            <div class="brand">
+                <img src="{% static 'rdf4j/logo.svg' %}" alt="Open GDB" />
+            </div>
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-rule">
+            <div class="dot"></div>
+            <div class="line"></div>
+        </div>
+    </footer>
+</body>
+</html>
