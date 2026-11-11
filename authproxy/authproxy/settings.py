@@ -181,6 +181,7 @@ if KEYCLOAK_SERVER_URL and KEYCLOAK_CLIENT_ID and KEYCLOAK_CLIENT_SECRET:
     }
 
 ACCOUNT_ADAPTER = "rdf4j.adapters.AccountAdapter"
+SOCIALACCOUNT_ADAPTER = "rdf4j.adapters.SocialAccountAdapter"
 ACCOUNT_LOGIN_METHODS = {"username"}
 ACCOUNT_SIGNUP_FIELDS = ["username*", "password1*", "password2*"]
 ACCOUNT_EMAIL_VERIFICATION = "none"
