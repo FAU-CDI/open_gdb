@@ -541,9 +541,12 @@ Available variables:
         url = f"{RDF4J_URL}{RDF4J_REPOSITORY_PATH}{self.slug}"
         headers = {"Content-Type": "text/turtle"}
 
-        response = requests.put(
-            url=url, data=self.to_turtle(), headers=headers, timeout=REQUEST_TIMEOUT
-        )
+        try:
+            response = requests.put(
+                url=url, data=self.to_turtle(), headers=headers, timeout=REQUEST_TIMEOUT
+            )
+        except requests.RequestException as e:
+            raise IntegrityError(f"RDF4J did not create repository {self.slug!r}: {e}") from e
 
         # RDF4J 6 answers 201 or 204 for a new repository and 409 for an existing one. Keep the
         # Django row for an existing repository: the post_save handler deletes the row on errors,
@@ -567,8 +570,8 @@ Available variables:
     def delete_remote(self) -> None:
         """Delete the corresponding repository from the RDF4J server.
 
-        RDF4J answers 204 for a deleted repository and 404 for one that is already gone; both
-        leave no data behind. Anything else, including an unreachable RDF4J, raises, so the
+        RDF4J answers 204 for a deleted repository and 404 "Unknown repository" for one that is
+        already gone; both leave no data behind. Anything else, including an unreachable RDF4J, raises, so the
         pre_delete handler keeps the row and the caller learns that the data is still there.
         """
         url = f"{RDF4J_URL}{RDF4J_REPOSITORY_PATH}{self.slug}"
@@ -579,7 +582,10 @@ Available variables:
                 f"RDF4J did not delete repository {self.slug!r}: {e}"
             ) from e
 
-        if response.status_code not in (204, 404):
+        # Only RDF4J's own 404 means the repository is gone. A 404 from Tomcat (webapp not
+        # deployed, wrong RDF4J_URL) says nothing about the data and must keep the row.
+        is_gone = response.status_code == 404 and "unknown repository" in (response.text or "").lower()
+        if response.status_code != 204 and not is_gone:
             raise IntegrityError(
                 f"RDF4J did not delete repository {self.slug!r} "
                 f"(HTTP {response.status_code}): {(response.text or '')[:300]}"

@@ -3,6 +3,8 @@ from typing import Any
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import Permission
+from django.contrib import messages
+from django.db.utils import IntegrityError
 from django.http import HttpRequest
 
 from .models import RepoPermission, Repository, User
@@ -29,6 +31,22 @@ class RepositoryAdmin(admin.ModelAdmin):
         return mark_safe(
             f"""<a class="button" target="_blank" href="/update/{obj.slug}">Update</a>"""
         )
+
+    def delete_model(self, request: HttpRequest, obj: Repository) -> None:
+        """Delete one repository; a failed RDF4J delete keeps it and shows why."""
+        try:
+            obj.delete()
+        except IntegrityError as e:
+            self.message_user(request, str(e), level=messages.ERROR)
+
+    def delete_queryset(self, request: HttpRequest, queryset) -> None:
+        """Delete row by row, so one failed RDF4J delete keeps only its own row.
+
+        A bulk delete sends every pre_delete first and rolls back all rows when one fails,
+        although RDF4J already deleted the repositories before it.
+        """
+        for repository in queryset:
+            self.delete_model(request, repository)
 
 
 # admin.site.register(Repository)

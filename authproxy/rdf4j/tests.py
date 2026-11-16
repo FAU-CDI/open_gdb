@@ -17,6 +17,7 @@ from django.db import transaction
 from django.db.utils import IntegrityError
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from . import changelog
 from .models import (
@@ -26,6 +27,7 @@ from .models import (
     User,
     default_turtle_template,
 )
+from .views.graphdb.repositories import RepositoryView
 from .sso import _pick_claims, _repo_ids_from_claim, sync_user_access
 
 NATIVE_INDEXES = "tag:rdf4j.org,2023:config/native.tripleIndexes"
@@ -71,6 +73,8 @@ class RemoteMixin:
         self.addCleanup(patcher.stop)
         self.models_requests.put.return_value = response(201)
         self.models_requests.delete.return_value = response(204)
+        # The module is a mock; "except requests.RequestException" needs the real class.
+        self.models_requests.RequestException = requests.RequestException
 
     def create(self, slug, template):
         return Repository.objects.create(slug=slug, description=slug, turtle_template=template)
@@ -199,8 +203,8 @@ class CreateRemoteTests(RemoteMixin, TestCase):
 
 class DeleteRemoteTests(RemoteMixin, TestCase):
     def test_deleted_or_already_gone_removes_the_row(self):
-        for status in (204, 404):
-            self.models_requests.delete.return_value = response(status)
+        for status, text in ((204, ""), (404, "Unknown repository: gone404")):
+            self.models_requests.delete.return_value = response(status, text)
             repository = self.create(f"gone{status}", LMDB_STORE_TEMPLATE)
             repository.delete()
             self.assertFalse(Repository.objects.filter(slug=f"gone{status}").exists())
@@ -214,12 +218,35 @@ class DeleteRemoteTests(RemoteMixin, TestCase):
         self.assertTrue(Repository.objects.filter(slug="kept").exists())
 
     def test_unreachable_rdf4j_keeps_the_row(self):
-        self.models_requests.RequestException = requests.RequestException
         self.models_requests.delete.side_effect = requests.ConnectionError("refused")
         repository = self.create("unreachable", LMDB_STORE_TEMPLATE)
         with self.assertRaises(IntegrityError), transaction.atomic():
             repository.delete()
         self.assertTrue(Repository.objects.filter(slug="unreachable").exists())
+
+    def test_404_without_unknown_repository_keeps_the_row(self):
+        self.models_requests.delete.return_value = response(404, "<!doctype html>HTTP Status 404")
+        repository = self.create("tomcat", LMDB_STORE_TEMPLATE)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            repository.delete()
+        self.assertTrue(Repository.objects.filter(slug="tomcat").exists())
+
+    def test_delete_view_answers_502_and_keeps_the_row(self):
+        self.models_requests.delete.return_value = response(500, "Server error")
+        self.create("viewkept", LMDB_STORE_TEMPLATE)
+        admin = User.objects.create_superuser("admin", password="x")
+        request = APIRequestFactory().delete("/rest/repositories/viewkept")
+        force_authenticate(request, user=admin)
+        with transaction.atomic():
+            answer = RepositoryView.as_view()(request, repository_id="viewkept")
+        self.assertEqual(answer.status_code, 502)
+        self.assertTrue(Repository.objects.filter(slug="viewkept").exists())
+
+    def test_unreachable_rdf4j_on_create_raises_an_integrity_error(self):
+        self.models_requests.put.side_effect = requests.ConnectionError("refused")
+        with self.assertRaises(IntegrityError):
+            self.create("downcreate", LMDB_STORE_TEMPLATE)
+        self.assertFalse(Repository.objects.filter(slug="downcreate").exists())
 
     def test_failed_create_removes_the_row_even_when_the_remote_delete_fails(self):
         self.models_requests.put.return_value = response(400, "Unsupported Sail type")

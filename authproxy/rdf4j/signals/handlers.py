@@ -1,9 +1,13 @@
 """Signal handlers"""
 
+import logging
+
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
 from ..models import Repository
+
+logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=Repository)
@@ -38,6 +42,12 @@ def delete_rdf4j_repo(instance: Repository, **kwargs) -> None:
     """
     try:
         instance.delete_remote()
-    except Exception:
+    except Exception as e:
         if not getattr(instance, "remote_delete_is_best_effort", False):
             raise
+        # A create that timed out may have left the repository in RDF4J after all.
+        logger.warning(
+            "Could not delete repository %s from RDF4J after its failed create: %s",
+            instance.slug,
+            e,
+        )
