@@ -13,8 +13,9 @@ http {
     default_type  application/octet-stream;
 
     # set a resolver for docker.
-    # this is the embedded docker dns server.
-    resolver 127.0.0.11;
+    # this is the embedded docker dns server. valid= keeps a restarted
+    # container's new IP from being ignored until the old answer expires.
+    resolver 127.0.0.11 valid=10s;
 
     # Disable access logging
     access_log  off;
