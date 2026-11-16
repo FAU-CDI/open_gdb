@@ -18,8 +18,12 @@ def post_repo_save(instance: Repository, created=False, **kwargs) -> None:
         try:
             instance.create_remote()
         except Exception:
-            # In case something goes wrong delete it again to avoid inconsistency
+            # In case something goes wrong delete it again to avoid inconsistency. RDF4J has no
+            # repository to delete here, so a failed remote delete must not keep the row.
+            instance.remote_delete_is_best_effort = True
             instance.delete()
+            # The caller must learn that nothing was created; the permissions below need the row.
+            raise
 
         # Create the necessary permissions after the remote is successfully created
         instance.update_permissions()
@@ -27,8 +31,13 @@ def post_repo_save(instance: Repository, created=False, **kwargs) -> None:
 
 @receiver(pre_delete, sender=Repository)
 def delete_rdf4j_repo(instance: Repository, **kwargs) -> None:
-    """Delete the repo on the RDF4J server before deleting it in the database"""
+    """Delete the repo on the RDF4J server before deleting it in the database.
+
+    A failed remote delete raises and keeps the row: deleting only the row would leave the data
+    in RDF4J without a repository pointing at it, and the caller would get a success.
+    """
     try:
         instance.delete_remote()
     except Exception:
-        pass
+        if not getattr(instance, "remote_delete_is_best_effort", False):
+            raise

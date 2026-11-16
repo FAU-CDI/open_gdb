@@ -8,9 +8,12 @@ import importlib
 from io import StringIO
 from unittest import mock
 
+import requests
+
 from allauth.account.signals import user_logged_in
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import transaction
 from django.db.utils import IntegrityError
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -192,6 +195,38 @@ class CreateRemoteTests(RemoteMixin, TestCase):
             repository.create_remote()
         self.assertIn("HTTP 400", str(raised.exception))
         self.assertIn("Unsupported Sail type", str(raised.exception))
+
+
+class DeleteRemoteTests(RemoteMixin, TestCase):
+    def test_deleted_or_already_gone_removes_the_row(self):
+        for status in (204, 404):
+            self.models_requests.delete.return_value = response(status)
+            repository = self.create(f"gone{status}", LMDB_STORE_TEMPLATE)
+            repository.delete()
+            self.assertFalse(Repository.objects.filter(slug=f"gone{status}").exists())
+
+    def test_failed_remote_delete_keeps_the_row(self):
+        self.models_requests.delete.return_value = response(500, "Server error")
+        repository = self.create("kept", LMDB_STORE_TEMPLATE)
+        with self.assertRaises(IntegrityError) as raised, transaction.atomic():
+            repository.delete()
+        self.assertIn("HTTP 500", str(raised.exception))
+        self.assertTrue(Repository.objects.filter(slug="kept").exists())
+
+    def test_unreachable_rdf4j_keeps_the_row(self):
+        self.models_requests.RequestException = requests.RequestException
+        self.models_requests.delete.side_effect = requests.ConnectionError("refused")
+        repository = self.create("unreachable", LMDB_STORE_TEMPLATE)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            repository.delete()
+        self.assertTrue(Repository.objects.filter(slug="unreachable").exists())
+
+    def test_failed_create_removes_the_row_even_when_the_remote_delete_fails(self):
+        self.models_requests.put.return_value = response(400, "Unsupported Sail type")
+        self.models_requests.delete.return_value = response(500)
+        with self.assertRaises(IntegrityError):
+            self.create("broken", LMDB_STORE_TEMPLATE)
+        self.assertFalse(Repository.objects.filter(slug="broken").exists())
 
 
 class EnableChangelogTests(RemoteMixin, TestCase):

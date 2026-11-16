@@ -75,7 +75,8 @@ class RepositoryView(APIView):
             repository.delete()
             return HttpResponse()
         except IntegrityError as e:
-            return ErrorResponse(status=400, error=e)
+            # RDF4J did not delete the repository; the row stays so the delete can be retried.
+            return ErrorResponse(status=502, error=e)
 
     def get(self, request, repository_id: str):
         """Get repository configuration as JSON or text/turtle"""

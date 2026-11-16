@@ -565,13 +565,24 @@ Available variables:
         )
 
     def delete_remote(self) -> None:
-        """Delete the corresponding repository from from the RDF4J server"""
-        url = f"{RDF4J_URL}{RDF4J_REPOSITORY_PATH}{self.slug}"
-        response = requests.delete(url=url, timeout=REQUEST_TIMEOUT)
+        """Delete the corresponding repository from the RDF4J server.
 
-        if response.status_code != 204:
+        RDF4J answers 204 for a deleted repository and 404 for one that is already gone; both
+        leave no data behind. Anything else, including an unreachable RDF4J, raises, so the
+        pre_delete handler keeps the row and the caller learns that the data is still there.
+        """
+        url = f"{RDF4J_URL}{RDF4J_REPOSITORY_PATH}{self.slug}"
+        try:
+            response = requests.delete(url=url, timeout=REQUEST_TIMEOUT)
+        except requests.RequestException as e:
             raise IntegrityError(
-                f"Something went wrong while deleting the {self.slug} repo from the RDF4J server"
+                f"RDF4J did not delete repository {self.slug!r}: {e}"
+            ) from e
+
+        if response.status_code not in (204, 404):
+            raise IntegrityError(
+                f"RDF4J did not delete repository {self.slug!r} "
+                f"(HTTP {response.status_code}): {(response.text or '')[:300]}"
             )
         self.has_remote = False
 
